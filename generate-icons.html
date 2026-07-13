@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Icon Generator</title></head>
+<body style="background:#0d1117;color:#fff;font-family:sans-serif;text-align:center;padding-top:40px;">
+<h2>TV Time — Icon Generator</h2>
+<p>Opening this page automatically downloads the app icons.</p>
+<p style="color:#8b949e;">Save them into your TVTime folder, then you can delete this page.</p>
+<canvas id="c" width="512" height="512" style="display:none;"></canvas>
+<script>
+var canvas = document.getElementById('c');
+var ctx = canvas.getContext('2d');
+
+function drawIcon(size) {
+    canvas.width = size; canvas.height = size;
+    // Background
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, size, size);
+    // Rounded rect TV body
+    var r = size * 0.1;
+    var x = size * 0.1, y = size * 0.15, w = size * 0.8, h = size * 0.6;
+    ctx.fillStyle = '#161b22';
+    ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+    ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r);
+    ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h);
+    ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
+    ctx.quadraticCurveTo(x,y,x+r,y); ctx.fill();
+    // Screen
+    var sx = size * 0.16, sy = size * 0.21, sw = size * 0.68, sh = size * 0.46;
+    ctx.fillStyle = '#58a6ff';
+    ctx.fillRect(sx, sy, sw, sh);
+    // Play triangle
+    ctx.fillStyle = '#fff';
+    var cx = size * 0.5, cy = size * 0.45, tri = size * 0.06;
+    ctx.beginPath(); ctx.moveTo(cx-tri, cy-tri*1.5); ctx.lineTo(cx+tri*1.2, cy); ctx.lineTo(cx-tri, cy+tri*1.5); ctx.fill();
+    // Stand
+    ctx.fillStyle = '#30363d';
+    ctx.fillRect(size*0.3, size*0.78, size*0.4, size*0.04);
+    ctx.fillRect(size*0.38, size*0.82, size*0.24, size*0.08);
+
+    canvas.toBlob(function(blob) {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'icon-' + size + '.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    });
+}
+drawIcon(192);
+setTimeout(function(){ drawIcon(512); }, 500);
+document.write('<p style="color:#3fb950;margin-top:20px;">✅ Icons downloaded! Move them to your TVTime folder.</p>');
+</script>
+</body></html>

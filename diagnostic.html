@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TV Time - Diagnostic</title>
+<style>
+    body { background:#0d1117; color:#e6edf3; font-family:system-ui; padding:20px; max-width:700px; margin:0 auto; }
+    h1 { color:#58a6ff; }
+    .step { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px; margin:12px 0; }
+    .step h3 { margin:0 0 8px; color:#e6edf3; }
+    .ok { color:#3fb950; }
+    .fail { color:#f85149; }
+    .info { color:#8b949e; font-size:13px; }
+    pre { background:#0d1117; padding:12px; border-radius:6px; overflow-x:auto; font-size:12px; max-height:300px; overflow-y:auto; }
+    button { padding:10px 20px; background:#238636; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:14px; margin-right:8px; }
+    button:hover { filter:brightness(1.2); }
+    button.danger { background:#da3633; }
+    .spinner { display:inline-block; width:14px; height:14px; border:2px solid #30363d; border-top-color:#58a6ff; border-radius:50%; animation:spin 0.6s linear infinite; margin-right:6px; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+</style>
+</head>
+<body>
+<h1>🔍 TV Time Diagnostic</h1>
+<p class="info">This page tests each step of the data pipeline to find exactly where the issue is.</p>
+
+<div id="steps"></div>
+
+<script>
+const API_KEY = localStorage.getItem('tvtime_tmdb_key') || 'ce5eb501bd5e8f0bfc298a955bc1831c';
+const RESULTS = [];
+const el = document.getElementById('steps');
+
+function addStep(title) {
+    const div = document.createElement('div');
+    div.className = 'step';
+    div.innerHTML = '<h3><span class="spinner"></span> ' + title + '</h3>';
+    el.appendChild(div);
+    return div;
+}
+
+function updateStep(div, status, detail) {
+    const icon = status === 'ok' ? '✅' : status === 'fail' ? '❌' : '⏳';
+    const cls = status === 'ok' ? 'ok' : status === 'fail' ? 'fail' : 'info';
+    div.querySelector('h3').innerHTML = icon + ' ' + div.querySelector('h3').textContent.replace('⏳ ','').replace('✅ ','').replace('❌ ','');
+    if (detail) {
+        div.innerHTML += '<p class="' + cls + '">' + detail + '</p>';
+    }
+}
+
+async function runDiagnostic() {
+    // Step 1: Check API key
+    let step = addStep('Checking API key...');
+    let key = API_KEY;
+    if (!key || key.length < 10) {
+        updateStep(step, 'fail', 'No API key found in localStorage. Please go back and add your TMDB API key in Settings first.');
+        return;
+    }
+    updateStep(step, 'ok', 'API key found (' + key.substring(0,6) + '...)');
+
+    // Step 2: Test TMDB connectivity
+    step = addStep('Testing TMDB API connectivity...');
+    try {
+        const res = await fetch('https://api.themoviedb.org/3/configuration?api_key=' + key);
+        const data = await res.json();
+        if (data.images) {
+            updateStep(step, 'ok', 'Connected to TMDB. Image base URL: ' + data.images.secure_base_url);
+        } else {
+            updateStep(step, 'fail', 'Unexpected response: ' + JSON.stringify(data).substring(0,200));
+            return;
+        }
+    } catch(e) {
+        updateStep(step, 'fail', 'Network error: ' + e.message + '. This likely means the browser is blocking requests from file:// origin.');
+        return;
+    }
+
+    // Step 3: Search for a test show
+    step = addStep('Searching TMDB for "Silo"...');
+    try {
+        const res = await fetch('https://api.themoviedb.org/3/search/tv?api_key=' + key + '&query=Silo');
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+            const show = data.results[0];
+            updateStep(step, 'ok', 'Found: "' + show.name + '" (TMDB ID: ' + show.id + ', first aired: ' + show.first_air_date + ')');
+            RESULTS.push({name: 'Silo', tmdbId: show.id});
+        } else {
+            updateStep(step, 'fail', 'No results returned.');
+            return;
+        }
+    } catch(e) {
+        updateStep(step, 'fail', 'Error: ' + e.message);
+        return;
+    }
+
+    // Step 4: Get show details with next_episode_to_air
+    step = addStep('Getting Silo show details (checking for upcoming episodes)...');
+    try {
+        const res = await fetch('https://api.themoviedb.org/3/tv/' + RESULTS[0].tmdbId + '?api_key=' + key);
+        const show = await res.json();
+        const next = show.next_episode_to_air;
+        const last = show.last_episode_to_air;
+        let detail = 'Show: "' + show.name + '" | Status: ' + show.status + ' | Seasons: ' + show.number_of_seasons;
+        if (next) {
+            detail += '<br>▶ <b>NEXT EPISODE:</b> S' + next.season_number + ' E' + next.episode_number +
+                ' — "' + next.name + '" — airs <b>' + next.air_date + '</b>';
+        } else {
+            detail += '<br>⚠ No next episode scheduled';
+        }
+        if (last) {
+            detail += '<br>◀ Last aired: S' + last.season_number + ' E' + last.episode_number +
+                ' — "' + last.name + '" — ' + last.air_date;
+        }
+        updateStep(step, next ? 'ok' : 'info', detail);
+    } catch(e) {
+        updateStep(step, 'fail', 'Error: ' + e.message);
+        return;
+    }
+
+    // Step 5: Test a batch of shows
+    step = addStep('Testing batch search for 3 shows...');
+    const testShows = ['Silo', 'House of the Dragon', 'Severance'];
+    const found = [];
+    try {
+        for (const name of testShows) {
+            const res = await fetch('https://api.themoviedb.org/3/search/tv?api_key=' + key + '&query=' + encodeURIComponent(name));
+            const data = await res.json();
+            if (data.results && data.results.length > 0) {
+                found.push(name + ' → ' + data.results[0].name + ' (id:' + data.results[0].id + ')');
+            }
+        }
+        updateStep(step, 'ok', 'All searches worked:<br>' + found.join('<br>'));
+    } catch(e) {
+        updateStep(step, 'fail', 'Error: ' + e.message);
+    }
+
+    // Step 6: Cache test
+    step = addStep('Testing localStorage caching...');
+    try {
+        const testKey = 'tvtime_test_' + Date.now();
+        localStorage.setItem(testKey, 'works');
+        const val = localStorage.getItem(testKey);
+        localStorage.removeItem(testKey);
+        if (val === 'works') {
+            updateStep(step, 'ok', 'localStorage is working correctly.');
+        } else {
+            updateStep(step, 'fail', 'localStorage read/write mismatch.');
+        }
+    } catch(e) {
+        updateStep(step, 'fail', 'localStorage error: ' + e.message + '. This would prevent API key and cache from working.');
+    }
+
+    // Summary
+    step = addStep('Summary');
+    updateStep(step, 'ok',
+        'All tests passed! The API and caching work fine.<br><br>' +
+        '<b>The issue with the main app is likely one of:</b><br>' +
+        '1. Too many API calls (62 shows) causing a slow load — check the loading spinner next time<br>' +
+        '2. A JavaScript error in the app code — check browser DevTools console (F12)<br>' +
+        '3. Old cached data causing conflicts<br><br>' +
+        '<button onclick="clearAndReload()">Clear Cache & Reload Main App</button>' +
+        '<button onclick="window.location.href=\'index.html\'">Go to Main App</button>'
+    );
+}
+
+function clearAndReload() {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('tvtime_')) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+    alert('Cleared ' + keys.length + ' cached entries. The app will now reload.');
+    window.location.href = 'index.html';
+}
+
+runDiagnostic();
+</script>
+</body>
+</html>

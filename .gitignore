@@ -1,0 +1,22 @@
+# Claude AI assistant files
+.claude/
+
+# GDPR personal data - DO NOT COMMIT
+gdpr-data/
+gdpr-data-full/
+gdpr-data.zip
+
+# Reference screenshots (large, not needed for the app)
+*.jpeg
+*.JPEG
+*.PNG
+*.JPG
+!icon-192.png
+!icon-512.png
+
+# Archive
+TVTime.zip
+
+# OS files
+.DS_Store
+Thumbs.db

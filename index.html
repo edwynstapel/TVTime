@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <title>TV Time</title>
+
+    <!-- PWA / Apple Mobile Web App -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TV Time">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0d1117">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
+
+    <style>
+/* ===== CSS Variables & Theme ===== */
+:root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #1c2333;
+    --bg-card-hover: #242d3d;
+    --bg-input: #1a1f2e;
+    --border-color: #30363d;
+    --border-subtle: #21262d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --accent: #58a6ff;
+    --accent-glow: rgba(88, 166, 255, 0.15);
+    --accent-secondary: #3fb950;
+    --danger: #f85149;
+    --warning: #d2991d;
+    --purple: #a371f7;
+    --orange: #f0883e;
+    --pink: #db61a2;
+    --network-bg: #2a3040;
+    --countdown-bg: rgba(88, 166, 255, 0.12);
+    --poster-placeholder: #1c2533;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-xs: 4px;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+.top-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; height: 48px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+.nav-logo { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 16px; color: var(--text-primary); }
+.logo-icon { font-size: 22px; }
+.nav-tabs { display: flex; gap: 2px; background: var(--bg-primary); border-radius: 8px; padding: 2px; }
+.nav-tab {
+    display: flex; align-items: center; gap: 4px; padding: 6px 10px;
+    border: none; background: transparent; color: var(--text-secondary);
+    border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 500;
+    transition: all 0.15s ease;
+}
+.nav-tab.active { background: var(--accent); color: #fff; }
+.nav-actions { display: flex; gap: 4px; }
+.btn-icon {
+    width: 32px; height: 32px; border: none; background: transparent;
+    color: var(--text-secondary); border-radius: 6px; cursor: pointer;
+    font-size: 15px; display: flex; align-items: center; justify-content: center;
+}
+.btn-icon:hover { background: var(--bg-card); color: var(--text-primary); }
+.btn-primary, .btn-secondary {
+    padding: 10px 20px; border: none; border-radius: var(--radius-sm);
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s ease;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { filter: brightness(1.15); }
+.btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-color); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+main { max-width: 800px; margin: 0 auto; padding: 12px; padding-bottom: 80px; }
+.upcoming-header, .shows-header, .watched-header, .explore-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 10px;
+}
+.upcoming-header h1, .shows-header h1, .watched-header h1, .explore-header h1 { font-size: 22px; font-weight: 700; }
+.upcoming-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.explore-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.filter-group { display: flex; background: var(--bg-card); border-radius: 6px; padding: 2px; }
+.filter-btn {
+    padding: 5px 10px; border: none; background: transparent; color: var(--text-secondary);
+    border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.15s ease;
+}
+.filter-btn.active { background: var(--accent); color: #fff; }
+.date-nav { display: flex; align-items: center; gap: 4px; }
+#dateRangeLabel { font-size: 12px; color: var(--text-secondary); min-width: 80px; text-align: center; }
+.timeline { display: flex; flex-direction: column; }
+.date-group { margin-bottom: 6px; }
+.date-header {
+    display: flex; align-items: center; gap: 10px; padding: 10px 0;
+    position: sticky; top: 48px; background: var(--bg-primary); z-index: 10;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.date-day { font-size: 13px; font-weight: 600; min-width: 70px; }
+.date-month { font-size: 11px; color: var(--text-secondary); font-weight: 400; }
+.date-relative { font-size: 12px; color: var(--accent); margin-left: auto; }
+.episode-card {
+    display: flex; gap: 10px; padding: 10px; border-radius: var(--radius);
+    cursor: pointer; transition: all 0.15s ease; border-bottom: 1px solid var(--border-subtle);
+}
+.episode-card:hover { background: var(--bg-card-hover); }
+.episode-poster {
+    width: 48px; height: 72px; border-radius: var(--radius-xs);
+    object-fit: cover; background: var(--poster-placeholder); flex-shrink: 0;
+}
+.episode-poster-placeholder {
+    width: 48px; height: 72px; border-radius: var(--radius-xs);
+    background: var(--poster-placeholder); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: var(--text-muted);
+}
+.episode-info { flex: 1; min-width: 0; }
+.episode-show-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.episode-show-name-link { color: var(--accent); cursor: pointer; display: inline-block; max-width: 100%; }
+.episode-show-name-link:hover { text-decoration: underline; }
+.episode-meta { font-size: 14px; color: var(--text-secondary); margin-bottom: 2px; }
+.episode-title {
+    font-size: 13px; color: var(--text-primary); margin-bottom: 4px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.episode-footer { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.episode-network {
+    display: flex; align-items: center; gap: 3px; padding: 2px 6px;
+    background: var(--network-bg); border-radius: 10px; font-size: 10px; color: var(--text-secondary);
+}
+.episode-network img { width: 14px; height: 14px; border-radius: 2px; }
+.episode-countdown { font-size: 11px; font-weight: 600; color: var(--accent); padding: 2px 6px; background: var(--countdown-bg); border-radius: 10px; }
+.episode-airtime { font-size: 11px; color: var(--text-muted); }
+.empty-state { text-align: center; padding: 50px 20px; color: var(--text-muted); }
+.empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 16px; color: var(--text-secondary); margin-bottom: 6px; }
+.loading-spinner { text-align: center; padding: 50px 20px; color: var(--text-secondary); }
+.spinner {
+    width: 36px; height: 36px; border: 3px solid var(--border-color);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.explore-load-more { text-align: center; margin-top: 24px; padding-bottom: 16px; }
+.show-card-actions { padding: 0 8px 8px; }
+.show-add-btn, .show-following-btn {
+    width: 100%; padding: 5px 0; border-radius: 5px; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s ease; border: none;
+}
+.show-add-btn { background: var(--accent); color: #fff; }
+.show-following-btn { background: var(--bg-card); color: var(--accent-secondary); border: 1px solid var(--border-color); cursor: default; }
+.shows-controls { display: flex; gap: 8px; align-items: center; }
+.search-input {
+    padding: 7px 12px; background: var(--bg-input); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;
+    outline: none; width: 160px; transition: border-color 0.15s;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--text-muted); }
+.show-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.shows-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 12px; }
+.show-card {
+    border-radius: var(--radius); overflow: hidden; cursor: pointer;
+    transition: transform 0.15s ease; background: var(--bg-card);
+}
+.show-card:active { transform: scale(0.97); }
+.show-card-poster { width: 100%; aspect-ratio: 2/3; object-fit: cover; background: var(--poster-placeholder); display: block; }
+.show-card-poster-placeholder {
+    width: 100%; aspect-ratio: 2/3; background: var(--poster-placeholder);
+    display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--text-muted);
+}
+.show-card-info { padding: 8px; }
+.show-card-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.show-card-episodes { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+.watched-list { display: flex; flex-direction: column; }
+.watched-card {
+    display: flex; gap: 10px; padding: 10px; border-radius: var(--radius);
+    cursor: pointer; transition: all 0.15s ease;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.watched-card:hover { background: var(--bg-card-hover); }
+.watched-poster { width: 40px; height: 60px; border-radius: var(--radius-xs); object-fit: cover; background: var(--poster-placeholder); flex-shrink: 0; }
+.watched-info { flex: 1; min-width: 0; }
+.watched-show-name { font-size: 13px; font-weight: 600; }
+.watched-episode { font-size: 12px; color: var(--text-secondary); }
+.watched-date { font-size: 11px; color: var(--text-muted); }
+.watched-rating { font-size: 16px; margin-left: auto; flex-shrink: 0; }
+.modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; overflow-y: auto; }
+.modal.active { display: block; }
+.modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); }
+.modal-content {
+    position: relative; max-width: 640px; margin: 20px auto;
+    background: var(--bg-secondary); border-radius: 14px;
+    border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);
+    z-index: 1001; overflow: hidden;
+}
+.modal-content.modal-sm { max-width: 400px; padding: 20px; }
+.modal-close {
+    position: absolute; top: 10px; right: 10px; width: 30px; height: 30px;
+    border: none; background: rgba(0,0,0,0.5); color: #fff; border-radius: 50%;
+    font-size: 13px; cursor: pointer; z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+}
+.episode-detail-header { position: relative; }
+.episode-detail-backdrop { width: 100%; height: 160px; object-fit: cover; opacity: 0.6; }
+.episode-detail-backdrop-placeholder { width: 100%; height: 140px; background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card-hover) 100%); }
+.episode-detail-poster-row { display: flex; gap: 12px; padding: 0 16px; margin-top: -40px; position: relative; z-index: 2; }
+.episode-detail-still {
+    width: 90px; height: 130px; border-radius: var(--radius); object-fit: cover;
+    border: 2px solid var(--bg-secondary); box-shadow: var(--shadow-lg);
+}
+.episode-detail-still-placeholder {
+    width: 90px; height: 130px; border-radius: var(--radius); background: var(--bg-card);
+    border: 2px solid var(--bg-secondary); display: flex; align-items: center; justify-content: center; font-size: 30px;
+}
+.episode-detail-body { padding: 16px; }
+.episode-detail-show { font-size: 12px; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.episode-detail-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+.episode-detail-meta { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.episode-detail-overview { font-size: 14px; line-height: 1.6; margin-bottom: 16px; }
+.episode-detail-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.detail-info-item { padding: 10px; background: var(--bg-card); border-radius: var(--radius-sm); }
+.detail-info-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.detail-info-value { font-size: 13px; font-weight: 500; }
+.episode-detail-cast { margin-bottom: 16px; }
+.episode-detail-cast h3, .episode-detail-watch h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.cast-list { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+.cast-member { flex-shrink: 0; text-align: center; width: 65px; }
+.cast-member-photo { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--bg-card); margin-bottom: 4px; }
+.cast-member-photo-placeholder { width: 48px; height: 48px; border-radius: 50%; background: var(--bg-card); margin: 0 auto 4px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.cast-member-name { font-size: 11px; font-weight: 500; }
+.cast-member-character { font-size: 10px; color: var(--text-muted); }
+.watch-providers { display: flex; gap: 8px; flex-wrap: wrap; }
+.watch-provider { padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.settings-form { display: flex; flex-direction: column; gap: 10px; }
+.settings-form label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.settings-form select { -webkit-appearance: none; appearance: none; cursor: pointer; }
+.help-text { font-size: 12px; color: var(--text-muted); }
+.modal-content.modal-show-detail { max-width: 720px; border-radius: 14px; overflow: hidden; }
+.show-detail-loading { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+.show-detail-hero { position: relative; height: 180px; overflow: hidden; }
+.show-detail-backdrop { width: 100%; height: 100%; object-fit: cover; opacity: 0.55; }
+.show-detail-backdrop-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); }
+.show-detail-hero-gradient { position: absolute; bottom: 0; left: 0; right: 0; height: 120px; background: linear-gradient(transparent, var(--bg-secondary)); pointer-events: none; }
+.show-detail-hero-info { position: absolute; bottom: 12px; left: 115px; right: 16px; display: flex; flex-direction: column; gap: 2px; }
+.show-detail-hero-name { font-size: 18px; font-weight: 700; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,0.6); line-height: 1.1; }
+.show-detail-hero-meta { font-size: 11px; color: rgba(255,255,255,0.8); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.show-detail-hero-meta .meta-sep { width: 2px; height: 2px; border-radius: 50%; background: rgba(255,255,255,0.5); }
+.show-detail-hero-rating { display: flex; align-items: center; gap: 3px; font-weight: 600; color: #f5c518; }
+.show-hero-buttons { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.show-trailer-btn, .show-extra-info-btn {
+    display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px;
+    border-radius: 20px; font-size: 11px; font-weight: 600; transition: all 0.2s ease; width: fit-content;
+}
+.show-trailer-btn {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+    color: #fff; text-decoration: none;
+}
+.show-extra-info-btn {
+    background: rgba(163,113,247,0.2); border: 1px solid rgba(163,113,247,0.35);
+    color: #c4a0ff; cursor: pointer; font-family: inherit;
+}
+.show-extra-info-btn.active { background: rgba(163,113,247,0.35); }
+.trailer-icon { width: 12px; height: 12px; flex-shrink: 0; }
+.extra-info-panel { margin-bottom: 20px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); animation: fadeIn 0.3s ease; }
+.extra-info-content { font-size: 13px; line-height: 1.6; }
+.extra-info-content p { margin-bottom: 10px; }
+.extra-info-content ul { margin: 6px 0 12px 16px; }
+.extra-info-content li { margin-bottom: 3px; color: var(--text-secondary); }
+.extra-info-content strong { color: var(--text-primary); }
+.extra-info-content em { color: var(--accent); }
+.extra-info-error { color: var(--danger); font-size: 13px; }
+.extra-info-disclaimer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-subtle); font-size: 10px; color: var(--text-muted); font-style: italic; }
+.show-detail-poster-wrap { position: absolute; bottom: -30px; left: 14px; z-index: 3; }
+.show-detail-poster { width: 85px; height: 128px; border-radius: 8px; object-fit: cover; border: 2px solid var(--bg-secondary); box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+.show-detail-poster-placeholder { width: 85px; height: 128px; border-radius: 8px; background: var(--bg-card); border: 2px solid var(--bg-secondary); box-shadow: 0 6px 18px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 36px; color: var(--text-muted); }
+.show-detail-body { padding: 14px; padding-top: 40px; }
+.show-detail-overview { font-size: 14px; line-height: 1.6; margin-bottom: 18px; }
+.show-detail-info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 20px; }
+.show-detail-info-grid .detail-info-item { padding: 10px; background: var(--bg-card); border-radius: var(--radius-sm); }
+.show-detail-info-grid .detail-info-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.show-detail-info-grid .detail-info-value { font-size: 13px; font-weight: 500; }
+.show-detail-section { margin-bottom: 20px; }
+.show-detail-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.show-detail-section-header h3 { font-size: 16px; font-weight: 700; }
+.season-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.season-pill {
+    padding: 4px 10px; background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 16px; font-size: 12px; color: var(--text-secondary); cursor: pointer;
+    font-weight: 500; transition: all 0.15s ease; white-space: nowrap;
+}
+.season-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.show-episodes-list { display: flex; flex-direction: column; }
+.show-episode-item { display: flex; gap: 10px; padding: 10px; border-radius: var(--radius); cursor: pointer; border-bottom: 1px solid var(--border-subtle); }
+.show-episode-item:hover { background: var(--bg-card-hover); }
+.show-episode-still { width: 80px; height: 45px; border-radius: 6px; object-fit: cover; background: var(--bg-card); flex-shrink: 0; }
+.show-episode-still-placeholder { width: 80px; height: 45px; border-radius: 6px; background: var(--bg-card); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--text-muted); }
+.show-episode-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.show-episode-item-header { display: flex; align-items: center; gap: 6px; }
+.show-episode-number { font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.show-episode-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.show-episode-airdate { font-size: 11px; color: var(--text-muted); }
+.show-episode-overview { font-size: 12px; color: var(--text-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 1px; }
+.show-episode-rating { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 3px; }
+.show-detail-cast { margin-bottom: 20px; }
+.show-detail-cast h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.show-detail-cast .cast-list { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+.show-detail-cast .cast-member { flex-shrink: 0; text-align: center; width: 65px; }
+.show-detail-cast .cast-member-photo { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; background: var(--bg-card); margin-bottom: 4px; }
+.show-detail-cast .cast-member-photo-placeholder { width: 50px; height: 50px; border-radius: 50%; background: var(--bg-card); margin: 0 auto 4px; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+.show-detail-cast .cast-member-name { font-size: 11px; font-weight: 500; line-height: 1.3; }
+.show-detail-cast .cast-member-character { font-size: 10px; color: var(--text-muted); line-height: 1.3; }
+.show-episodes-loading { text-align: center; padding: 30px; color: var(--text-muted); }
+
+/* iPhone safe area & larger screens */
+@supports (padding-top: env(safe-area-inset-top)) {
+    .top-nav { padding-top: env(safe-area-inset-top); height: calc(48px + env(safe-area-inset-top)); }
+    .date-header { top: calc(48px + env(safe-area-inset-top)); }
+    main { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+}
+
+@media (min-width: 500px) {
+    .top-nav { padding: 0 20px; height: 52px; }
+    .nav-logo { font-size: 18px; }
+    .logo-icon { font-size: 24px; }
+    .tab-label { display: inline; }
+    .nav-tab { padding: 7px 14px; font-size: 14px; }
+    main { padding: 16px; }
+    .upcoming-header h1, .shows-header h1, .watched-header h1, .explore-header h1 { font-size: 24px; }
+    .shows-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+    .show-card-name { font-size: 13px; }
+    .episode-card { padding: 12px; gap: 12px; }
+    .episode-poster, .episode-poster-placeholder { width: 60px; height: 90px; }
+    .episode-show-name { font-size: 15px; }
+    .show-detail-hero { height: 220px; }
+    .show-detail-hero-info { left: 130px; }
+    .show-detail-hero-name { font-size: 22px; }
+    .show-detail-poster, .show-detail-poster-placeholder { width: 100px; height: 150px; }
+    .show-detail-poster-wrap { bottom: -35px; left: 20px; }
+    .show-detail-body { padding: 20px; padding-top: 50px; }
+    .show-detail-info-grid { grid-template-columns: repeat(4, 1fr); }
+    .date-header { top: 52px; }
+}
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.episode-card, .show-card, .watched-card { animation: fadeIn 0.3s ease forwards; }
+
+/* ===== Watched Toggle Button on Episode Rows ===== */
+.show-episode-item {
+    position: relative;
+    padding-right: 48px; /* space for toggle button */
+}
+.episode-watched-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    z-index: 2;
+    padding: 0;
+    line-height: 1;
+}
+.episode-watched-toggle:hover {
+    border-color: var(--accent-secondary);
+    color: var(--accent-secondary);
+}
+.episode-watched-toggle.watched {
+    background: var(--accent-secondary);
+    border-color: var(--accent-secondary);
+    color: #fff;
+}
+.episode-watched-toggle.watched:hover {
+    background: #2ea043;
+    border-color: #2ea043;
+}
+.show-episode-item.watched-episode {
+    opacity: 0.65;
+}
+.show-episode-item.watched-episode:hover {
+    opacity: 0.85;
+}
+
+/* ===== Show Detail Watched Progress ===== */
+.show-watched-progress {
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+}
+.show-watched-progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.show-watched-progress-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.show-watched-progress-count {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+.show-watched-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--border-color);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.show-watched-bar-fill {
+    height: 100%;
+    background: var(--accent-secondary);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    min-width: 0;
+}
+
+/* ===== Show Card Mini Progress ===== */
+.show-card-progress {
+    margin-top: 4px;
+    height: 3px;
+    background: var(--border-color);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.show-card-progress-fill {
+    height: 100%;
+    background: var(--accent-secondary);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+.show-card-watched-count {
+    font-size: 10px;
+    color: var(--accent-secondary);
+    margin-top: 2px;
+}
+
+/* ===== Watched Tab Updates ===== */
+.watched-toggle-btn {
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding: 0;
+    line-height: 1;
+}
+.watched-toggle-btn.watched {
+    background: var(--accent-secondary);
+    border-color: var(--accent-secondary);
+    color: #fff;
+}
+.watched-toggle-btn:hover {
+    border-color: var(--accent-secondary);
+    color: var(--accent-secondary);
+}
+.watched-toggle-btn.watched:hover {
+    background: #2ea043;
+    border-color: #2ea043;
+}
+.watched-card.watched-episode-card {
+    opacity: 0.7;
+}
+
+/* ===== Episode Detail Watched Toggle ===== */
+.episode-detail-watched-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 12px;
+    font-family: inherit;
+    border: 2px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+}
+.episode-detail-watched-toggle:hover {
+    border-color: var(--accent-secondary);
+    color: var(--accent-secondary);
+}
+.episode-detail-watched-toggle.watched {
+    background: var(--accent-secondary);
+    border-color: var(--accent-secondary);
+    color: #fff;
+}
+.episode-detail-watched-toggle.watched:hover {
+    background: #2ea043;
+    border-color: #2ea043;
+}
+
+    </style>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
+</head>
+<body>
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="nav-logo">
+            <span class="logo-icon">📺</span>
+            <span class="logo-text">TV Time</span>
+        </div>
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-tab="upcoming">
+                <span class="tab-icon">📅</span>
+                <span class="tab-label">Upcoming</span>
+            </button>
+            <button class="nav-tab" data-tab="explore">
+                <span class="tab-icon">🔍</span>
+                <span class="tab-label">Explore</span>
+            </button>
+            <button class="nav-tab" data-tab="shows">
+                <span class="tab-icon">📚</span>
+                <span class="tab-label">My Shows</span>
+            </button>
+            <button class="nav-tab" data-tab="watched">
+                <span class="tab-icon">✅</span>
+                <span class="tab-label">Watched</span>
+            </button>
+        </div>
+        <div class="nav-actions">
+            <button class="btn-icon" id="refreshBtn" title="Refresh data">🔄</button>
+            <button class="btn-icon" id="settingsBtn" title="Settings">⚙️</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="mainContent">
+        <!-- Upcoming Tab -->
+        <section id="upcomingTab" class="tab-content active">
+            <div class="upcoming-header">
+                <h1>Upcoming Episodes</h1>
+                <div class="upcoming-controls">
+                    <div class="filter-group">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="week">This Week</button>
+                        <button class="filter-btn" data-filter="today">Today</button>
+                    </div>
+                    <div class="date-nav">
+                        <button class="btn-icon" id="scrollPrevWeek">◀</button>
+                        <span id="dateRangeLabel">Upcoming</span>
+                        <button class="btn-icon" id="scrollNextWeek">▶</button>
+                    </div>
+                </div>
+            </div>
+            <div id="timelineContainer" class="timeline">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Loading upcoming episodes...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Explore Tab -->
+        <section id="exploreTab" class="tab-content">
+            <div class="explore-header">
+                <h1>Explore</h1>
+                <div class="explore-controls">
+                    <input type="text" id="exploreSearch" class="search-input" placeholder="Search shows...">
+                    <div class="filter-group" id="exploreFilterGroup">
+                        <button class="filter-btn active" data-explore="trending">🔥 Trending</button>
+                        <button class="filter-btn" data-explore="popular">⭐ Popular</button>
+                    </div>
+                </div>
+            </div>
+            <div id="exploreGrid" class="shows-grid">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Loading trending shows...</p>
+                </div>
+            </div>
+            <div class="explore-load-more" id="exploreLoadMore" style="display:none;">
+                <button class="btn-primary" id="loadMoreBtn">Load More</button>
+            </div>
+        </section>
+
+        <!-- Shows Tab -->
+        <section id="showsTab" class="tab-content">
+            <div class="shows-header">
+                <h1>My Shows</h1>
+                <div class="shows-controls">
+                    <input type="text" id="showSearch" class="search-input" placeholder="Search shows...">
+                    <span class="show-count" id="showCount">62 shows</span>
+                </div>
+            </div>
+            <div id="showsGrid" class="shows-grid">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Loading shows...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Watched Tab -->
+        <section id="watchedTab" class="tab-content">
+            <div class="watched-header">
+                <h1>Recently Watched</h1>
+                <span id="watchedCount" class="show-count"></span>
+            </div>
+            <div id="watchedList" class="watched-list">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Loading watched episodes...</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Show Detail Modal -->
+    <div id="showDetailModal" class="modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-show-detail">
+            <button class="modal-close" id="showDetailClose">✕</button>
+            <div id="showDetailContent" class="show-detail-content">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Episode Detail Modal -->
+    <div id="episodeModal" class="modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">✕</button>
+            <div id="episodeDetail" class="episode-detail">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-sm">
+            <button class="modal-close" id="settingsClose">✕</button>
+            <h2>Settings</h2>
+            <div class="settings-form">
+                <label for="apiKey">TMDB API Key</label>
+                <input type="text" id="apiKey" class="search-input" placeholder="Enter your TMDB API key (v3 auth)">
+                <p class="help-text">Get a free API key at <a href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org</a></p>
+                <label for="anthropicKey">DeepSeek API Key <span style="font-weight:400;color:var(--text-muted);">(for AI show research)</span></label>
+                <input type="password" id="anthropicKey" class="search-input" placeholder="sk-...">
+                <label for="cacheHours">Cache Duration (hours)</label>
+                <select id="cacheHours" class="search-input">
+                    <option value="1">1 hour</option>
+                    <option value="6" selected>6 hours</option>
+                    <option value="24">24 hours</option>
+                </select>
+                <button id="saveSettings" class="btn-primary">Save Settings</button>
+                <button id="clearCache" class="btn-secondary">Clear Cache</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/store.js"></script>
+    <script src="js/shows-data.js"></script>
+    <script src="js/tmdb.js"></script>
+    <script src="js/anthropic.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Register service worker for offline PWA support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(function(reg) {
+                console.log('[SW] Registered:', reg.scope);
+            }).catch(function(err) {
+                console.warn('[SW] Registration failed:', err);
+            });
+        }
+    </script>
+</body>
+</html>

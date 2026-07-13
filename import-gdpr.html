@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Import GDPR Watch History — TV Time</title>
+<style>
+:root{--bg:#0d1117;--bg2:#161b22;--card:#1c2333;--text:#e6edf3;--text2:#8b949e;--muted:#6e7681;--accent:#58a6ff;--green:#3fb950;--danger:#f85149;--border:#30363d;--radius:12px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;padding:20px}
+main{max-width:700px;margin:0 auto}
+h1{font-size:24px;margin-bottom:8px}
+h2{font-size:16px;margin:24px 0 12px;color:var(--text2)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card h3{font-size:14px;margin-bottom:4px}
+.card .meta{font-size:12px;color:var(--muted)}
+.btn{padding:12px 24px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;font-family:var(--font)}
+.btn-primary{background:var(--green);color:#fff;width:100%;margin-top:16px}
+.btn-primary:hover{filter:brightness(1.15)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.status{padding:12px;border-radius:8px;margin-top:12px;font-size:14px;display:none}
+.status.success{display:block;background:rgba(63,185,80,.1);border:1px solid var(--green);color:var(--green)}
+.status.warn{display:block;background:rgba(210,153,29,.1);border:1px solid var(--warning);color:var(--warning)}
+.status.info{display:block;background:rgba(88,166,255,.1);border:1px solid var(--accent);color:var(--accent)}
+.show-list{max-height:400px;overflow-y:auto;margin-top:12px}
+.show-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;gap:8px}
+.show-row .name{color:var(--text);flex:1}
+.show-row .detail{font-size:11px;color:var(--muted)}
+.show-row .count{color:var(--green);font-weight:600;white-space:nowrap}
+.show-row .id{font-size:10px;color:var(--muted);white-space:nowrap}
+.unmatched{color:var(--danger)}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+<h1>📺 Import GDPR Watch History</h1>
+<p style="color:var(--text2);margin-bottom:16px">Imports your watched episodes from the TV Time GDPR export using correct TMDB IDs from your app.</p>
+
+<div class="card" id="step1card">
+<h3>Step 1: Load TMDB Index</h3>
+<p class="meta">First we need to load your app's show→TMDB ID mappings. This requires <code>tvtime_tmdb_index</code> to exist in localStorage.</p>
+<p class="meta" style="margin-top:6px" id="indexStatus">Checking localStorage...</p>
+</div>
+
+<div class="card" id="step2card" style="display:none">
+<h3>Step 2: Match GDPR shows to TMDB IDs</h3>
+<p class="meta" id="matchSummary"></p>
+<div class="show-list" id="showList"></div>
+</div>
+
+<button class="btn btn-primary" id="importBtn" onclick="doImport()" disabled>
+📥 Import Episodes
+</button>
+<div class="status" id="status"></div>
+
+<p style="margin-top:24px;text-align:center;font-size:13px;color:var(--muted)">
+<a href="index.html">← Back to TV Time</a> &nbsp;|&nbsp;
+Tip: Open index.html first and load the Upcoming tab to build the TMDB index, then come back here.
+</p>
+</main>
+
+<script>
+// === GDPR WATCH DATA keyed by SHOW NAME (not ID) ===
+// These show names come directly from the GDPR CSVs
+var GDPR_BY_NAME = {
+    "Gold Rush": {"10":[7]},
+    "Silicon Valley": {"1":[1]},
+    "Madam Secretary": {"6":[8,10]},
+    "The Orville": {"3":[1]},
+    "SEAL Team": {"2":[1],"3":[5,16,18],"5":[3],"6":[1,2,3,4,5,6,9,10],"7":[1,2,3,4,5,10]},
+    "Star Trek: Discovery": {"3":[4,5,6,13],"4":[13],"5":[1,2,8]},
+    "Tom Clancy's Jack Ryan": {"1":[1],"2":[1],"3":[3,4,5,6,7,8],"4":[1,2,3,4,5]},
+    "The Peripheral": {"1":[1,2,3,4,5,6,7,8]},
+    "The Wheel of Time": {"1":[4],"2":[2,3,4,5,8],"3":[7,8]},
+    "See": {"1":[6,8]},
+    "The Mandalorian": {"1":[1,3],"2":[3,5,8]},
+    "The Falcon and The Winter Soldier": {"1":[6]},
+    "Star Trek: Picard": {"1":[1,5],"2":[1],"3":[1,2,3,4,5,6,7,8,9,10]},
+    "The Gilded Age": {"1":[1,2,3,4]},
+    "Halo": {"1":[1,8]},
+    "Reacher": {"1":[1],"2":[1],"3":[1,2,3,4,8]},
+    "Dune: Prophecy": {"1":[1]},
+    "Hawkeye (2021)": {"1":[1]},
+    "She-Hulk: Attorney at Law": {"1":[1]},
+    "Raised by Wolves (2020)": {"1":[1]},
+    "Masters of the Air": {"1":[8,9]},
+    "House of the Dragon": {"1":[1]},
+    "Star Trek: Strange New Worlds": {"1":[2,3,4,5,6,7,8,9,10],"2":[1,2,3,4,5,6,9,10],"3":[1,2,3]},
+    "Lioness": {"1":[4,5,6],"2":[1,2,6]},
+    "The Last of Us": {"1":[1,2,3,4,5,6,7,8,9]},
+    "Shōgun": {"1":[1,2,3,5,6,7,8,9]},
+    "Ahsoka": {"1":[1,2,3,5,6,7,8]},
+    "The Acolyte": {"1":[1,2,3,4,5,6,7,8]},
+    "Obi-Wan Kenobi": {"1":[1,2,3,4,5,6]},
+    "Ironheart": {"1":[4,5,6]},
+    "Moonhaven": {"1":[1]},
+    "Silo": {"1":[1,2,3,4,5,6,7,8,10],"2":[1,2,3,4,5,6,7,8,9,10]},
+    "The Endgame": {"1":[1,2,4,10]},
+    "3 Body Problem": {"1":[1,2,3,4,5,6,7,8]},
+    "Percy Jackson and the Olympians": {"1":[1]},
+    "The Diplomat": {"1":[1,2,3,4,5,6,7,8]},
+    "Fallout": {"1":[1]},
+    "Hijack": {"1":[1,2,3,4,5]},
+    "Star Wars: Skeleton Crew": {"1":[4,5,7,8]},
+    "The Elon Musk Show": {"1":[2,3]},
+    "The Gentlemen": {"1":[1,2,3,4,5]},
+    "The Day of the Jackal": {"1":[4,5,6,7]},
+    "American Primeval": {"1":[1,2,3,4,5,6]},
+    "Star Trek: Starfleet Academy": {"1":[1,2,3,4,5]},
+    "PLUR1BUS": {"1":[1,2,3,4,5,7,8,9]},
+    "Brilliant Minds": {"1":[3]},
+    "Murderbot": {"1":[1,2,3,4,5,6,7,9,10]},
+    "The War Between the Land and the Sea": {"1":[1,2,3]},
+    "Prime Target": {"1":[1,2,3,4,5]},
+    "Chad Powers": {"1":[1,2,3,4,5]},
+    "The Pitt": {"1":[1,2,11,12,13,14]},
+    "Paradise (2025)": {"1":[1,2,4]},
+    "Stick": {"1":[1,2,3,5,7,8,9,10]},
+    "The Terminal List: Dark Wolf": {"1":[1,2,3,4,5,6,7]}
+};
+
+var totalEps = 0;
+var showNames = Object.keys(GDPR_BY_NAME).sort();
+showNames.forEach(function(n){ var s=GDPR_BY_NAME[n]; Object.keys(s).forEach(function(sn){ totalEps+=s[sn].length }) });
+
+// Try to load tmdbIndex from localStorage
+var tmdbIndex = {};
+var indexLoaded = false;
+try {
+    var raw = localStorage.getItem('tvtime_tmdb_index');
+    if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.data) {
+            tmdbIndex = parsed.data;
+            indexLoaded = true;
+        }
+    }
+} catch(e) {}
+
+// Build a lookup: show name (lowercase normalized) → TMDB ID
+var nameToTmdbId = {};
+if (indexLoaded) {
+    Object.keys(tmdbIndex).forEach(function(name) {
+        if (tmdbIndex[name] && tmdbIndex[name].tmdbId) {
+            // Store both exact and normalized versions
+            nameToTmdbId[name] = tmdbIndex[name].tmdbId;
+            nameToTmdbId[name.toLowerCase()] = tmdbIndex[name].tmdbId;
+        }
+    });
+}
+
+document.getElementById('indexStatus').textContent = indexLoaded
+    ? '✅ Found TMDB index with ' + Object.keys(tmdbIndex).length + ' shows'
+    : '⚠️ No tmdbIndex found. Open index.html first, go to the Upcoming tab, then come back here.';
+
+// Match GDPR shows to TMDB IDs
+var matched = [];
+var unmatched = [];
+var matchedCount = 0;
+var unmatchedCount = 0;
+
+showNames.forEach(function(name) {
+    var seasons = GDPR_BY_NAME[name];
+    var count = 0;
+    Object.keys(seasons).forEach(function(sn){ count += seasons[sn].length });
+
+    var tmdbId = nameToTmdbId[name] || nameToTmdbId[name.toLowerCase()];
+    // Also try fuzzy match: strip parenthetical years
+    if (!tmdbId) {
+        var baseName = name.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+        tmdbId = nameToTmdbId[baseName] || nameToTmdbId[baseName.toLowerCase()];
+    }
+
+    if (tmdbId) {
+        matched.push({name: name, tmdbId: tmdbId, count: count, seasons: seasons});
+        matchedCount += count;
+    } else {
+        unmatched.push({name: name, count: count});
+        unmatchedCount += count;
+    }
+});
+
+document.getElementById('matchSummary').textContent =
+    (matched.length > 0 ? '✅ ' + matched.length + ' shows matched (' + matchedCount + ' episodes)' : '') +
+    (unmatched.length > 0 ? ' | ⚠️ ' + unmatched.length + ' shows not in your TMDB index (' + unmatchedCount + ' episodes)' : '');
+
+// Render list
+var html = '';
+matched.forEach(function(m) {
+    var sKeys = Object.keys(m.seasons);
+    var sStr = sKeys.map(function(sn){ return 'S'+sn+':'+m.seasons[sn].length }).join(', ');
+    html += '<div class="show-row"><span class="name">' + m.name.replace(/&/g,'&amp;') + '</span><span class="detail">' + sStr + '</span><span class="id">TMDB:' + m.tmdbId + '</span><span class="count">' + m.count + ' ep</span></div>';
+});
+unmatched.forEach(function(m) {
+    html += '<div class="show-row unmatched"><span class="name">' + m.name.replace(/&/g,'&amp;') + '</span><span class="detail">not in your followed shows</span><span class="count">' + m.count + ' ep</span></div>';
+});
+document.getElementById('showList').innerHTML = html || '<p style="color:var(--text-muted)">No shows loaded yet.</p>';
+
+// Show step 2
+if (indexLoaded) {
+    document.getElementById('step2card').style.display = '';
+    document.getElementById('importBtn').disabled = false;
+    document.getElementById('importBtn').textContent = '📥 Import ' + matchedCount + ' Episodes (' + matched.length + ' shows)';
+}
+
+function doImport() {
+    var btn = document.getElementById('importBtn');
+    var status = document.getElementById('status');
+    btn.disabled = true;
+    btn.textContent = 'Importing...';
+
+    try {
+        // Build the final watched data keyed by TMDB ID
+        var result = {};
+        matched.forEach(function(m) {
+            result[String(m.tmdbId)] = m.seasons;
+        });
+
+        // Merge with any existing watched data
+        try {
+            var existingRaw = localStorage.getItem('tvtime_watched_episodes');
+            if (existingRaw) {
+                var existing = JSON.parse(existingRaw);
+                Object.keys(existing).forEach(function(sid) {
+                    if (!result[sid]) {
+                        result[sid] = existing[sid];
+                    } else {
+                        var es = existing[sid];
+                        Object.keys(es).forEach(function(sn) {
+                            if (!result[sid][sn]) {
+                                result[sid][sn] = es[sn];
+                            } else {
+                                es[sn].forEach(function(ep) {
+                                    if (result[sid][sn].indexOf(ep) === -1) {
+                                        result[sid][sn].push(ep);
+                                    }
+                                });
+                                result[sid][sn].sort(function(a,b){return a-b});
+                            }
+                        });
+                    }
+                });
+            }
+        } catch(e) {}
+
+        localStorage.setItem('tvtime_watched_episodes', JSON.stringify(result));
+
+        // Also save show name mapping (TMDB ID → show name)
+        var nameMap = {};
+        matched.forEach(function(m) {
+            nameMap[String(m.tmdbId)] = m.name;
+        });
+        localStorage.setItem('tvtime_watched_show_names', JSON.stringify(nameMap));
+
+        // Verify
+        var verify = JSON.parse(localStorage.getItem('tvtime_watched_episodes'));
+        var vtotal = 0;
+        Object.keys(verify).forEach(function(s){ Object.keys(verify[s]).forEach(function(n){ vtotal+=verify[s][n].length }) });
+
+        status.className = 'status success';
+        status.textContent = '✅ Imported ' + vtotal + ' episodes across ' + Object.keys(verify).length + ' shows with CORRECT TMDB IDs. Refresh index.html to see your watched episodes!';
+
+        if (unmatched.length > 0) {
+            var status2 = document.createElement('div');
+            status2.className = 'status warn';
+            status2.style.marginTop = '8px';
+            status2.textContent = '⚠️ ' + unmatched.length + ' shows could not be matched (not in your TMDB index yet): ' + unmatched.map(function(m){return m.name}).join(', ');
+            status.parentNode.insertBefore(status2, status.nextSibling);
+        }
+
+        btn.textContent = '✅ Done!';
+    } catch(e) {
+        status.className = 'status info';
+        status.textContent = '❌ Import failed: ' + e.message;
+        btn.disabled = false;
+        btn.textContent = 'Retry Import';
+    }
+}
+</script>
+</body>
+</html>

@@ -731,11 +731,14 @@ function renderTimeline() {
             else label = '';
         }
 
-        var dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-        var monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        var dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+        var dayNum = date.getDate();
+        var monthName = date.toLocaleDateString('en-US', { month: 'long' });
 
         html += '<div class="date-group"><div class="date-header">' +
-            '<span class="date-day">' + dayName + ' <span class="date-month">' + monthDay + '</span></span>' +
+            '<span class="date-day-name">' + dayName + '</span>' +
+            '<span class="date-num">' + dayNum + '</span>' +
+            '<span class="date-month-label">' + monthName + '</span>' +
             (label ? '<span class="date-relative">' + label + '</span>' : '') +
             '</div>' +
             groups[dateKey].map(renderCard).join('') +

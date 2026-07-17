@@ -695,7 +695,7 @@ function renderTimeline() {
     var groups = {};
     filtered.forEach(function(ep) {
         if (!ep.airDate) return;
-        var key = ep.airDate.toISOString().split('T')[0];
+        var key = ep.air_date; // local date, not UTC — must match card countdown
         if (!groups[key]) groups[key] = [];
         groups[key].push(ep);
     });
@@ -725,7 +725,7 @@ function renderTimeline() {
         if (isToday) label = 'Today';
         else if (isTomorrow) label = 'Tomorrow';
         else {
-            var diff = Math.ceil((date - today) / 86400000);
+            var diff = Math.round((date - today) / 86400000);
             if (diff < 0) label = Math.abs(diff) + 'd ago';
             else if (diff > 0) label = 'in ' + diff + ' days';
             else label = '';
@@ -835,7 +835,7 @@ function renderCard(ep) {
     if (ep.airDate) {
         var now = new Date();
         now.setHours(0, 0, 0, 0);
-        var diff = Math.ceil((ep.airDate.getTime() - now.getTime()) / 86400000);
+        var diff = Math.round((ep.airDate.getTime() - now.getTime()) / 86400000);
         if (diff === 0) countdownPill = 'Today';
         else if (diff === 1) countdownPill = 'Tomorrow';
         else if (diff > 1 && diff <= 14) countdownPill = diff + 'd';

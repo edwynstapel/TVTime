@@ -159,16 +159,22 @@ var TMDB = {
      *   2. If the show is currently airing, fetch the current season for all upcoming episodes
      */
     async getUpcomingEpisodes(showId) {
-        const show = await this.getShow(showId);
+        const show = await this.fetch('/tv/' + showId, { append_to_response: 'images' });
         const episodes = [];
         const now = new Date();
         now.setHours(0, 0, 0, 0);
         const sevenDaysAgo = new Date(now);
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+        // Extract show logo (prefer English, fallback to first available)
+        var logos = (show.images && show.images.logos) ? show.images.logos : [];
+        var logo = logos.find(function(l) { return l.iso_639_1 === 'en'; }) || logos[0];
+        var showLogo = logo ? this.imageUrl(logo.file_path, LOGO) : null;
+
         const enrich = (ep) => ({
             showId: show.id,
             showName: show.name,
+            showLogo: showLogo,
             showPoster: this.imageUrl(show.poster_path, POSTER_SM),
             showBackdrop: this.imageUrl(show.backdrop_path, BACKDROP),
             networks: (show.networks || []).map(n => ({

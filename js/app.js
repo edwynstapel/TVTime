@@ -419,7 +419,7 @@ async function loadUpcoming(force) {
         for (var j = 0; j < matched.length; j += 8) {
             var showBatch = matched.slice(j, Math.min(j + 8, matched.length));
             var results = await Promise.allSettled(showBatch.map(function(s) {
-                return TMDB.getShow(tmdbIndex[s.name].tmdbId);
+                return TMDB.fetch('/tv/' + tmdbIndex[s.name].tmdbId, { append_to_response: 'images' });
             }));
 
             results.forEach(function(r, idx) {
@@ -480,8 +480,14 @@ async function loadUpcoming(force) {
 
         // Helper: build an episode object from raw TMDB episode + show data
         function enrich(ep, show) {
+            // Extract show logo (prefer English, fallback to first available)
+            var logos = (show.images && show.images.logos) ? show.images.logos : [];
+            var logo = logos.find(function(l) { return l.iso_639_1 === 'en'; }) || logos[0];
+            var showLogo = logo ? TMDB.imageUrl(logo.file_path, '/w92') : null;
+
             return {
                 showId: show.id, showName: show.name,
+                showLogo: showLogo,
                 showPoster: TMDB.imageUrl(show.poster_path, '/w185'),
                 showBackdrop: TMDB.imageUrl(show.backdrop_path, '/w780'),
                 networks: (show.networks || []).map(function(n) {
@@ -843,6 +849,10 @@ function renderCard(ep) {
         else if (diff > 14) countdownPill = diff + 'd';
     }
 
+    // Show title badge: outlined pill with uppercase text + chevron
+    var showNameHtml = '<span class="episode-show-badge episode-show-name-link" data-show-name="' + escAttr(ep.showName) + '">' +
+        esc(ep.showName) + ' <span class="episode-show-chevron">›</span></span>';
+
     var epName = ep.name ? ('<span class="episode-sep">·</span>' + esc(ep.name)) : '';
 
     return '<div class="episode-card" data-tmdb-show-id="' + ep.tmdbShowId +
@@ -850,7 +860,7 @@ function renderCard(ep) {
         posterHtml +
         '<div class="episode-info">' +
             '<div class="episode-header">' +
-                '<span class="episode-show-name episode-show-name-link" data-show-name="' + escAttr(ep.showName) + '">' + esc(ep.showName) + '</span>' +
+                showNameHtml +
                 (countdownPill ? '<span class="episode-countdown-pill">' + countdownPill + '</span>' : '') +
             '</div>' +
             '<div class="episode-meta">' + fmtSE(ep.season_number, ep.episode_number) + epName + '</div>' +

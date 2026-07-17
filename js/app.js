@@ -762,6 +762,51 @@ function renderTimeline() {
             openShowDetail(this.dataset.showName);
         });
     });
+
+    // --- Past episode graying + scroll reveal ---
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var cards = c.querySelectorAll('.episode-card');
+    var anchorFound = false;
+
+    // Find the first card with airDate >= today (the "next to air" anchor)
+    // and mark all cards before it as past
+    cards.forEach(function(card) {
+        var airDateStr = card.dataset.airDate;
+        if (!airDateStr) return;
+        var airDate = new Date(airDateStr + 'T00:00:00');
+        if (!anchorFound && airDate >= today) {
+            anchorFound = true;
+        }
+        if (!anchorFound) {
+            card.classList.add('episode-past');
+        }
+    });
+
+    // IntersectionObserver: reveal past episodes when scrolled into view.
+    // We delay activation by 200ms so the initial paint shows past episodes
+    // grayed — otherwise the observer fires immediately for any past episodes
+    // already visible in the viewport, defeating the effect.
+    if (window._pastEpisodeObserver) window._pastEpisodeObserver.disconnect();
+    if (window._pastObserverTimer) clearTimeout(window._pastObserverTimer);
+    window._pastObserverReady = false;
+    var observer = new IntersectionObserver(function(entries) {
+        if (!window._pastObserverReady) return;
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('episode-revealed');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { rootMargin: '0px 0px -20px 0px' });
+
+    c.querySelectorAll('.episode-past').forEach(function(card) {
+        observer.observe(card);
+    });
+    window._pastEpisodeObserver = observer;
+    window._pastObserverTimer = setTimeout(function() {
+        window._pastObserverReady = true;
+    }, 200);
 }
 
 function renderCard(ep) {
@@ -783,38 +828,33 @@ function renderCard(ep) {
         }).join('');
     }
 
-    var airTime = '';
-    if (ep.air_date) {
-        var d = new Date(ep.air_date + 'T00:00:00');
-        airTime = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    }
-
     var countdown = '';
+    var countdownPill = '';
     if (ep.airDate) {
         var now = new Date();
         now.setHours(0, 0, 0, 0);
         var diff = Math.ceil((ep.airDate.getTime() - now.getTime()) / 86400000);
-        if (diff === 0) countdown = 'Today';
-        else if (diff === 1) countdown = 'Tomorrow';
-        else if (diff > 1 && diff <= 14) countdown = 'in ' + diff + ' days';
-        else if (diff < 0 && diff >= -7) countdown = Math.abs(diff) + 'd ago';
+        if (diff === 0) { countdown = 'Today'; countdownPill = 'Today'; }
+        else if (diff === 1) { countdown = 'Tomorrow'; countdownPill = 'Tomorrow'; }
+        else if (diff > 1 && diff <= 14) { countdown = 'in ' + diff + ' days'; countdownPill = diff + 'd'; }
+        else if (diff < 0 && diff >= -7) { countdown = Math.abs(diff) + 'd ago'; countdownPill = Math.abs(diff) + 'd ago'; }
+        else if (diff > 14) { countdown = 'in ' + diff + ' days'; countdownPill = diff + 'd'; }
     }
 
     var title = ep.overview || ep.name || '';
+    var epName = ep.name ? ('<span class="episode-sep">·</span>' + esc(ep.name)) : '';
 
     return '<div class="episode-card" data-tmdb-show-id="' + ep.tmdbShowId +
-        '" data-season="' + ep.season_number + '" data-episode="' + ep.episode_number + '">' +
+        '" data-season="' + ep.season_number + '" data-episode="' + ep.episode_number + '" data-air-date="' + (ep.air_date || '') + '">' +
         posterHtml +
         '<div class="episode-info">' +
-            '<span class="episode-show-name episode-show-name-link" data-show-name="' + escAttr(ep.showName) + '">' + esc(ep.showName) + '</span>' +
-            '<div class="episode-meta">' + fmtSE(ep.season_number, ep.episode_number) +
-                (ep.name ? ' • ' + esc(ep.name) : '') + '</div>' +
-            '<div class="episode-title">' + esc(title) + '</div>' +
-            '<div class="episode-footer">' +
-                networks +
-                (countdown ? '<span class="episode-countdown">' + countdown + '</span>' : '') +
-                '<span class="episode-airtime">' + airTime + '</span>' +
+            '<div class="episode-header">' +
+                '<span class="episode-show-name episode-show-name-link" data-show-name="' + escAttr(ep.showName) + '">' + esc(ep.showName) + '</span>' +
+                (countdownPill ? '<span class="episode-countdown-pill">' + countdownPill + '</span>' : '') +
             '</div>' +
+            '<div class="episode-meta">' + fmtSE(ep.season_number, ep.episode_number) + epName + '</div>' +
+            (title ? '<div class="episode-title">' + esc(title) + '</div>' : '') +
+            (networks ? '<div class="episode-footer">' + networks + '</div>' : '') +
         '</div></div>';
 }
 
@@ -917,7 +957,7 @@ function renderDetail(ep, container) {
                 'id="' + toggleId + '" ' +
                 'data-show-id="' + ep.tmdbShowId + '" ' +
                 'data-season="' + ep.season_number + '" ' +
-                'data-episode="' + ep.episode_number + '">' +
+                'data-episode="' + ep.episode_number + '" data-air-date="' + (ep.air_date || '') + '">' +
                 (epWatched ? '✓ Watched' : '○ Mark as watched') +
             '</button>' +
             (ep.overview ? '<div class="episode-detail-overview">' + esc(ep.overview) + '</div>' : '') +
@@ -1930,7 +1970,7 @@ async function loadSeasonEpisodes(showId, seasonNumber, fallbackPosterUrl) {
             return '<div class="show-episode-item' + watchedClass + '" ' +
                 'data-show-id="' + showId + '" ' +
                 'data-season="' + seasonNumber + '" ' +
-                'data-episode="' + ep.episode_number + '">' +
+                'data-episode="' + ep.episode_number + '" data-air-date="' + (ep.air_date || '') + '">' +
                 stillHtml +
                 '<div class="show-episode-item-info">' +
                     '<div class="show-episode-item-header">' +
@@ -2056,7 +2096,7 @@ function renderWatched() {
                 : '<div class="watched-poster" style="background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:18px;">📺</div>';
             var date = ep.airDate ? ep.airDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
             return '<div class="watched-card watched-episode-card" data-tmdb-show-id="' + ep.tmdbShowId +
-                '" data-season="' + ep.season_number + '" data-episode="' + ep.episode_number + '">' +
+                '" data-season="' + ep.season_number + '" data-episode="' + ep.episode_number + '" data-air-date="' + (ep.air_date || '') + '">' +
                 img +
                 '<div class="watched-info">' +
                     '<div class="watched-show-name">' + esc(ep.showName) + '</div>' +
@@ -2082,7 +2122,7 @@ function renderWatched() {
                 : '<div class="watched-poster" style="background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:18px;">📺</div>';
             var date = ep.airDate ? ep.airDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
             return '<div class="watched-card" data-tmdb-show-id="' + ep.tmdbShowId +
-                '" data-season="' + ep.season_number + '" data-episode="' + ep.episode_number + '">' +
+                '" data-season="' + ep.season_number + '" data-episode="' + ep.episode_number + '" data-air-date="' + (ep.air_date || '') + '">' +
                 img +
                 '<div class="watched-info">' +
                     '<div class="watched-show-name">' + esc(ep.showName) + '</div>' +

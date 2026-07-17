@@ -110,20 +110,21 @@ main { max-width: 800px; margin: 0 auto; padding: 12px; padding-bottom: 80px; }
 .filter-btn.active { background: var(--accent); color: #fff; }
 .date-nav { display: flex; align-items: center; gap: 4px; }
 #dateRangeLabel { font-size: 12px; color: var(--text-secondary); min-width: 80px; text-align: center; }
-.timeline { display: flex; flex-direction: column; }
-.date-group { margin-bottom: 6px; }
+.timeline { display: flex; flex-direction: column; gap: 2px; }
+.date-group { margin-bottom: 14px; }
 .date-header {
-    display: flex; align-items: center; gap: 10px; padding: 10px 0;
+    display: flex; align-items: center; gap: 10px; padding: 12px 4px 8px;
     position: sticky; top: 48px; background: var(--bg-primary); z-index: 10;
-    border-bottom: 1px solid var(--border-subtle);
 }
-.date-day { font-size: 13px; font-weight: 600; min-width: 70px; }
-.date-month { font-size: 11px; color: var(--text-secondary); font-weight: 400; }
-.date-relative { font-size: 12px; color: var(--accent); margin-left: auto; }
+.date-day { font-size: 14px; font-weight: 700; }
+.date-month { font-size: 12px; color: var(--text-secondary); font-weight: 400; margin-left: 4px; }
+.date-relative { font-size: 13px; font-weight: 600; color: var(--accent); margin-left: auto; }
 .episode-card {
-    display: flex; gap: 12px; padding: 12px; border-radius: var(--radius);
-    cursor: pointer; transition: background 0.15s ease; border-bottom: 1px solid var(--border-subtle);
+    display: flex; gap: 14px; padding: 14px; border-radius: 12px;
+    cursor: pointer; transition: background 0.15s ease;
+    background: var(--bg-card); margin-bottom: 8px;
 }
+.episode-card:last-child { margin-bottom: 0; }
 .episode-card:hover { background: var(--bg-card-hover); }
 .episode-card.episode-past {
     animation: none;  /* cancel fadeIn — animations override static opacity */
@@ -135,39 +136,35 @@ main { max-width: 800px; margin: 0 auto; padding: 12px; padding-bottom: 80px; }
     opacity: 1;
 }
 .episode-poster {
-    width: 56px; height: 84px; border-radius: 6px;
+    width: 72px; height: 108px; border-radius: 8px;
     object-fit: cover; background: var(--poster-placeholder); flex-shrink: 0;
 }
 .episode-poster-placeholder {
-    width: 56px; height: 84px; border-radius: 6px;
+    width: 72px; height: 108px; border-radius: 8px;
     background: var(--poster-placeholder); flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 22px; color: var(--text-muted);
+    font-size: 24px; color: var(--text-muted);
 }
-.episode-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.episode-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.episode-show-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+.episode-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; justify-content: center; }
+.episode-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.episode-show-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
 .episode-show-name-link { cursor: pointer; }
 .episode-show-name-link:hover { color: var(--accent); }
-.episode-sep { color: var(--text-muted); margin: 0 4px; }
-.episode-meta { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.episode-sep { color: var(--text-muted); margin: 0 5px; }
+.episode-meta { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .episode-title {
     font-size: 12px; color: var(--text-muted); line-height: 1.4;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.episode-footer { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.episode-footer { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .episode-network {
-    display: flex; align-items: center; gap: 3px; padding: 2px 6px;
+    display: flex; align-items: center; gap: 3px; padding: 2px 7px;
     background: var(--network-bg); border-radius: 10px; font-size: 10px; color: var(--text-secondary);
 }
 .episode-network img { width: 14px; height: 14px; border-radius: 2px; }
-.episode-countdown {
-    font-size: 12px; font-weight: 600; color: var(--accent);
-    white-space: nowrap; flex-shrink: 0;
-}
 .episode-countdown-pill {
-    font-size: 11px; font-weight: 600; color: var(--accent);
-    padding: 2px 8px; background: var(--countdown-bg); border-radius: 10px;
+    font-size: 12px; font-weight: 700; color: #fff;
+    padding: 4px 10px; background: var(--accent); border-radius: 12px;
     white-space: nowrap; flex-shrink: 0;
 }
 .empty-state { text-align: center; padding: 50px 20px; color: var(--text-muted); }
@@ -368,8 +365,8 @@ main { max-width: 800px; margin: 0 auto; padding: 12px; padding-bottom: 80px; }
     .upcoming-header h1, .shows-header h1, .watched-header h1, .explore-header h1 { font-size: 24px; }
     .shows-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
     .show-card-name { font-size: 13px; }
-    .episode-poster, .episode-poster-placeholder { width: 60px; height: 90px; }
-    .episode-show-name { font-size: 15px; }
+    .episode-poster, .episode-poster-placeholder { width: 80px; height: 120px; }
+    .episode-show-name { font-size: 16px; }
     .show-detail-hero { height: 220px; }
     .show-detail-hero-info { left: 130px; }
     .show-detail-hero-name { font-size: 22px; }

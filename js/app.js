@@ -828,20 +828,18 @@ function renderCard(ep) {
         }).join('');
     }
 
-    var countdown = '';
     var countdownPill = '';
     if (ep.airDate) {
         var now = new Date();
         now.setHours(0, 0, 0, 0);
         var diff = Math.ceil((ep.airDate.getTime() - now.getTime()) / 86400000);
-        if (diff === 0) { countdown = 'Today'; countdownPill = 'Today'; }
-        else if (diff === 1) { countdown = 'Tomorrow'; countdownPill = 'Tomorrow'; }
-        else if (diff > 1 && diff <= 14) { countdown = 'in ' + diff + ' days'; countdownPill = diff + 'd'; }
-        else if (diff < 0 && diff >= -7) { countdown = Math.abs(diff) + 'd ago'; countdownPill = Math.abs(diff) + 'd ago'; }
-        else if (diff > 14) { countdown = 'in ' + diff + ' days'; countdownPill = diff + 'd'; }
+        if (diff === 0) countdownPill = 'Today';
+        else if (diff === 1) countdownPill = 'Tomorrow';
+        else if (diff > 1 && diff <= 14) countdownPill = diff + 'd';
+        else if (diff < 0 && diff >= -7) countdownPill = Math.abs(diff) + 'd ago';
+        else if (diff > 14) countdownPill = diff + 'd';
     }
 
-    var title = ep.overview || ep.name || '';
     var epName = ep.name ? ('<span class="episode-sep">·</span>' + esc(ep.name)) : '';
 
     return '<div class="episode-card" data-tmdb-show-id="' + ep.tmdbShowId +
@@ -853,7 +851,6 @@ function renderCard(ep) {
                 (countdownPill ? '<span class="episode-countdown-pill">' + countdownPill + '</span>' : '') +
             '</div>' +
             '<div class="episode-meta">' + fmtSE(ep.season_number, ep.episode_number) + epName + '</div>' +
-            (title ? '<div class="episode-title">' + esc(title) + '</div>' : '') +
             (networks ? '<div class="episode-footer">' + networks + '</div>' : '') +
         '</div></div>';
 }

@@ -107,20 +107,28 @@ function init() {
         }
     } catch(e) {}
 
-    // Restore cached TMDB index
+    // Restore cached TMDB index (localStorage first, then cookie bridge)
     try {
-        var raw = localStorage.getItem('tvtime_tmdb_index');
+        var raw = localStorage.getItem('tvtime_tmdb_index') || getLargeCookie('tvtime_tmdb_index');
         if (raw) {
             var parsed = JSON.parse(raw);
             if (parsed && parsed.data) tmdbIndex = parsed.data;
+            // Sync back to localStorage if from cookie
+            if (raw && !localStorage.getItem('tvtime_tmdb_index')) {
+                try { localStorage.setItem('tvtime_tmdb_index', raw); } catch(e) {}
+            }
         }
     } catch(e) {}
 
-    // Restore cached upcoming episodes
+    // Restore cached upcoming episodes (localStorage first, then cookie bridge)
     try {
-        var raw2 = localStorage.getItem('tvtime_upcoming_episodes');
+        var raw2 = localStorage.getItem('tvtime_upcoming_episodes') || getLargeCookie('tvtime_upcoming_episodes');
         if (raw2) {
             var parsed2 = JSON.parse(raw2);
+            // Sync back to localStorage if from cookie
+            if (!localStorage.getItem('tvtime_upcoming_episodes')) {
+                try { localStorage.setItem('tvtime_upcoming_episodes', raw2); } catch(e) {}
+            }
             if (parsed2 && parsed2.data && parsed2.data.length > 0) {
                 upcoming = parsed2.data.map(function(ep) {
                     ep.airDate = ep.airDate ? new Date(ep.airDate) : null;
@@ -152,6 +160,13 @@ function init() {
         if (lsWatched && !getCookie('tvtime_watched_episodes') && lsWatched.length < 3500) {
             setCookie('tvtime_watched_episodes', lsWatched, 365);
         }
+
+        // Sync cache data via multi-part cookies so Web App loads instantly
+        var lsIdx = localStorage.getItem('tvtime_tmdb_index');
+        if (lsIdx && !getLargeCookie('tvtime_tmdb_index')) setLargeCookie('tvtime_tmdb_index', lsIdx, 1);
+
+        var lsUp = localStorage.getItem('tvtime_upcoming_episodes');
+        if (lsUp && !getLargeCookie('tvtime_upcoming_episodes')) setLargeCookie('tvtime_upcoming_episodes', lsUp, 1);
     } catch(e) {}
 
     // Listen for localStorage changes from other tabs (e.g. GDPR import)
@@ -414,8 +429,9 @@ async function loadUpcoming(force) {
                 }));
                 detail('Matched ' + Math.min(i + 4, uncached.length) + '/' + uncached.length);
             }
-            try { localStorage.setItem('tvtime_tmdb_index',
-                JSON.stringify({data: tmdbIndex, expires: Date.now() + 24*60*60*1000}));
+            try { var raw = JSON.stringify({data: tmdbIndex, expires: Date.now() + 24*60*60*1000});
+                localStorage.setItem('tvtime_tmdb_index', raw);
+                setLargeCookie('tvtime_tmdb_index', raw, 1);
             } catch(e) {}
         }
 
@@ -581,8 +597,9 @@ async function loadUpcoming(force) {
             if (seen[key]) return false; seen[key] = true; return true;
         });
 
-        try { localStorage.setItem('tvtime_upcoming_episodes',
-            JSON.stringify({data: upcoming, expires: Date.now() + 6*60*60*1000}));
+        try { var rawUp = JSON.stringify({data: upcoming, expires: Date.now() + 6*60*60*1000});
+            localStorage.setItem('tvtime_upcoming_episodes', rawUp);
+            setLargeCookie('tvtime_upcoming_episodes', rawUp, 1);
         } catch(e) {}
 
         status('Done! ' + upcoming.length + ' upcoming episodes from ' +
@@ -1709,8 +1726,9 @@ async function openShowDetail(showName) {
                         posterPath: result.poster_path, backdropPath: result.backdrop_path,
                         firstAirDate: result.first_air_date, overview: result.overview,
                         voteAverage: result.vote_average };
-                    try { localStorage.setItem('tvtime_tmdb_index',
-                        JSON.stringify({data: tmdbIndex, expires: Date.now() + 24*60*60*1000}));
+                    try { var rawIdx = JSON.stringify({data: tmdbIndex, expires: Date.now() + 24*60*60*1000});
+                        localStorage.setItem('tvtime_tmdb_index', rawIdx);
+                        setLargeCookie('tvtime_tmdb_index', rawIdx, 1);
                     } catch(e) {}
                     t = tmdbIndex[showName];
                 }

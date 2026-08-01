@@ -17,6 +17,7 @@ var followedTmdbIds = new Set(); // Set of followed TMDB IDs (strings)
 var explorePage = 1;
 var exploreMode = 'trending';
 var exploreCache = {};           // {trending: {1: [shows]}, popular: {1: [shows]}}
+var unfollowedBuiltIn = new Set(); // built-in shows the user unfollowed
 var watchedEpisodes = {};        // {showId: {seasonNum: Set of episodeNums}}
 var watchedShowNames = {};       // {tmdbShowId: showName} — loaded from GDPR import
 var currentShowDetailId = null;  // TMDB show ID currently open in show detail modal
@@ -75,9 +76,19 @@ async function init() {
         try { localStorage.setItem('tvtime_data_version', String(DATA_VER)); } catch(e) {}
     }
 
-    // Load show list (built-in + user-added)
+    // Load unfollowed built-in shows
     try {
-        shows = (window.FOLLOWED_SHOWS || []).map(function(n) { return {name: n}; });
+        var rawUnfollowed = localStorage.getItem('tvtime_unfollowed');
+        if (rawUnfollowed) {
+            JSON.parse(rawUnfollowed).forEach(function(n) { unfollowedBuiltIn.add(n); });
+        }
+    } catch(e) {}
+
+    // Load show list (built-in + user-added), excluding unfollowed
+    try {
+        shows = (window.FOLLOWED_SHOWS || [])
+            .filter(function(n) { return !unfollowedBuiltIn.has(n); })
+            .map(function(n) { return {name: n}; });
     } catch(e) {
         shows = [];
     }
@@ -1216,6 +1227,7 @@ function saveUserShows() {
         var data = JSON.stringify(userShows);
         localStorage.setItem('tvtime_user_shows', data);
         IDB.mirror('tvtime_user_shows', data);
+        saveUnfollowed();
     } catch(e) {}
 }
 
@@ -1223,6 +1235,23 @@ function addUserShow(showInfo) {
     // showInfo: {name, tmdbId, posterPath, backdropPath, firstAirDate, overview, voteAverage}
     if (userShows.some(function(us) { return us.name === showInfo.name; })) return;
     if (isShowFollowed(showInfo.name)) return;
+
+    // If it was a previously unfollowed built-in show, just re-add it
+    if (unfollowedBuiltIn.has(showInfo.name)) {
+        unfollowedBuiltIn.delete(showInfo.name);
+        shows.push({name: showInfo.name});
+        followedTmdbIds.add(String(showInfo.tmdbId));
+        saveUserShows();
+        document.getElementById('showCount').textContent = shows.length + ' shows';
+        // Update button
+        var b = document.querySelector('.show-card[data-show="' + escAttr(showInfo.name) + '"] .show-add-btn');
+        if (b) {
+            b.classList.add('show-following-btn');
+            b.classList.remove('show-add-btn');
+            b.textContent = '✓ Following';
+        }
+        return;
+    }
 
     userShows.push(showInfo);
     shows.push({name: showInfo.name});
@@ -1250,11 +1279,37 @@ function addUserShow(showInfo) {
         btn.classList.add('show-following-btn');
         btn.classList.remove('show-add-btn');
         btn.textContent = '✓ Following';
-        btn.style.background = '';
-        btn.style.color = '';
-        btn.style.border = '';
-        btn.style.cursor = 'default';
     }
+}
+
+function removeShow(showName, tmdbId) {
+    // Remove from userShows if user-added
+    userShows = userShows.filter(function(s) { return s.name !== showName; });
+
+    // Remove from followed TMDB IDs
+    if (tmdbId) followedTmdbIds.delete(String(tmdbId));
+
+    // Remove from shows array
+    shows = shows.filter(function(s) { return s.name !== showName; });
+
+    // If it's a built-in show (not user-added), track as unfollowed
+    var builtInNames = (window.FOLLOWED_SHOWS || []);
+    if (builtInNames.indexOf(showName) !== -1) {
+        unfollowedBuiltIn.add(showName);
+    }
+
+    saveUserShows();
+    document.getElementById('showCount').textContent = shows.length + ' shows';
+}
+
+function saveUnfollowed() {
+    try {
+        var arr = [];
+        unfollowedBuiltIn.forEach(function(n) { arr.push(n); });
+        var data = JSON.stringify(arr);
+        localStorage.setItem('tvtime_unfollowed', data);
+        IDB.mirror('tvtime_unfollowed', data);
+    } catch(e) {}
 }
 
 function pad2(n) { return (n < 10 ? '0' : '') + n; }
@@ -1462,7 +1517,7 @@ async function renderExplore(append) {
 
             var actionsHtml;
             if (followed) {
-                actionsHtml = '<button class="show-following-btn" disabled>✓ Following</button>';
+                actionsHtml = '<button class="show-following-btn" title="Tap to unfollow">✓ Following</button>';
             } else {
                 actionsHtml = '<button class="show-add-btn">+ Add</button>';
             }
@@ -1529,6 +1584,22 @@ async function renderExplore(append) {
                             voteAverage: result.voteAverage
                         });
                     }
+                });
+            }
+
+            // Following button click → unfollow
+            var followBtn = card.querySelector('.show-following-btn');
+            if (followBtn) {
+                followBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var showName = card.dataset.show;
+                    var result = results.find(function(r) { return r.name === showName; });
+                    removeShow(showName, result ? result.id : null);
+                    // Switch button back to Add
+                    followBtn.classList.remove('show-following-btn');
+                    followBtn.classList.add('show-add-btn');
+                    followBtn.textContent = '+ Add';
+                    followBtn.title = '';
                 });
             }
         });
@@ -1601,7 +1672,7 @@ async function renderExploreSearch(query, append) {
 
             var actionsHtml;
             if (followed) {
-                actionsHtml = '<button class="show-following-btn" disabled>✓ Following</button>';
+                actionsHtml = '<button class="show-following-btn" title="Tap to unfollow">✓ Following</button>';
             } else {
                 actionsHtml = '<button class="show-add-btn">+ Add</button>';
             }
@@ -1666,6 +1737,22 @@ async function renderExploreSearch(query, append) {
                             voteAverage: result.voteAverage
                         });
                     }
+                });
+            }
+
+            // Following button click → unfollow
+            var followBtn = card.querySelector('.show-following-btn');
+            if (followBtn) {
+                followBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var showName = card.dataset.show;
+                    var result = results.find(function(r) { return r.name === showName; });
+                    removeShow(showName, result ? result.id : null);
+                    // Switch button back to Add
+                    followBtn.classList.remove('show-following-btn');
+                    followBtn.classList.add('show-add-btn');
+                    followBtn.textContent = '+ Add';
+                    followBtn.title = '';
                 });
             }
         });

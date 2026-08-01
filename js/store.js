@@ -15,8 +15,11 @@ function setCookie(name, value, days) {
             date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
             expires = '; expires=' + date.toUTCString();
         }
-        document.cookie = name + '=' + encodeURIComponent(value) + expires + '; path=/; SameSite=Lax';
-    } catch(e) { /* Silently ignore cookie errors */ }
+        var encoded = encodeURIComponent(value);
+        // Warn if encoded size approaches 4KB cookie limit
+        if (encoded.length > 3800) console.warn('[CookieBridge] Large cookie "' + name + '": ' + encoded.length + ' bytes encoded');
+        document.cookie = name + '=' + encoded + expires + '; path=/; SameSite=Lax';
+    } catch(e) { console.warn('[CookieBridge] setCookie failed for "' + name + '":', e.message); }
 }
 
 function getCookie(name) {
@@ -37,12 +40,14 @@ function eraseCookie(name) {
     } catch(e) { /* Silently ignore */ }
 }
 
-// ── Multi-part cookie for larger data (up to ~35KB) ──────────
-// Splits data across multiple 3.5KB chunks so cache data can
+// ── Multi-part cookie for larger data (up to ~20KB) ──────────
+// Splits data across multiple 2KB chunks so cache data can
 // bridge between Safari and iOS Home Screen Web App.
+// Chunk size is conservative to stay under 4KB after URI encoding
+// (JSON special chars like " { } become 3-byte %XX sequences).
 
-var COOKIE_CHUNK_SIZE = 3400; // bytes per chunk, safe under 4KB limit
-var COOKIE_MAX_CHUNKS = 10;   // 10 × 3.4KB ≈ 34KB max
+var COOKIE_CHUNK_SIZE = 2000; // bytes per chunk, safe after URI encoding
+var COOKIE_MAX_CHUNKS = 10;   // 10 × 2KB ≈ 20KB max
 
 function setLargeCookie(name, value, days) {
     try {
@@ -56,20 +61,25 @@ function setLargeCookie(name, value, days) {
         if (!value) return;
 
         // Don't bother if it fits in a single cookie
-        if (value.length < COOKIE_CHUNK_SIZE) {
+        if (value.length <= COOKIE_CHUNK_SIZE) {
             setCookie(name, value, days);
+            console.log('[CookieBridge] Stored "' + name + '" as single cookie (' + value.length + ' bytes)');
             return;
         }
 
         // Split into chunks
         var chunks = Math.ceil(value.length / COOKIE_CHUNK_SIZE);
-        if (chunks > COOKIE_MAX_CHUNKS) return; // Too large, skip
+        if (chunks > COOKIE_MAX_CHUNKS) {
+            console.warn('[CookieBridge] "' + name + '" too large: ' + value.length + ' bytes, need ' + chunks + ' chunks (max ' + COOKIE_MAX_CHUNKS + ')');
+            return;
+        }
 
         for (var j = 0; j < chunks; j++) {
             setCookie(name + '_c' + j, value.substring(j * COOKIE_CHUNK_SIZE, (j + 1) * COOKIE_CHUNK_SIZE), days);
         }
         setCookie(name + '_n', String(chunks), days);
-    } catch(e) { /* Silently ignore */ }
+        console.log('[CookieBridge] Stored "' + name + '" as ' + chunks + ' chunks (' + value.length + ' bytes total)');
+    } catch(e) { console.warn('[CookieBridge] setLargeCookie failed for "' + name + '":', e.message); }
 }
 
 function getLargeCookie(name) {
@@ -77,16 +87,22 @@ function getLargeCookie(name) {
         var count = parseInt(getCookie(name + '_n')) || 0;
         if (count === 0) {
             // Try single cookie (fit in one)
-            return getCookie(name);
+            var single = getCookie(name);
+            if (single) console.log('[CookieBridge] Read "' + name + '" from single cookie (' + single.length + ' bytes)');
+            return single;
         }
-        if (count > COOKIE_MAX_CHUNKS) return null; // Invalid
+        if (count > COOKIE_MAX_CHUNKS) return null;
 
         var result = '';
         for (var i = 0; i < count; i++) {
             var chunk = getCookie(name + '_c' + i);
-            if (chunk === null) return null; // Missing chunk
+            if (chunk === null) {
+                console.warn('[CookieBridge] Missing chunk ' + i + '/' + count + ' for "' + name + '"');
+                return null;
+            }
             result += chunk;
         }
+        console.log('[CookieBridge] Read "' + name + '" from ' + count + ' chunks (' + result.length + ' bytes)');
         return result || null;
     } catch(e) { return null; }
 }

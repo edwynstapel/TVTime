@@ -109,24 +109,32 @@ function init() {
 
     // Restore cached TMDB index (localStorage first, then cookie bridge)
     try {
-        var raw = localStorage.getItem('tvtime_tmdb_index') || getLargeCookie('tvtime_tmdb_index');
+        var fromCookie = false;
+        var raw = localStorage.getItem('tvtime_tmdb_index');
+        if (!raw) { raw = getLargeCookie('tvtime_tmdb_index'); fromCookie = !!raw; }
         if (raw) {
             var parsed = JSON.parse(raw);
-            if (parsed && parsed.data) tmdbIndex = parsed.data;
-            // Sync back to localStorage if from cookie
-            if (raw && !localStorage.getItem('tvtime_tmdb_index')) {
-                try { localStorage.setItem('tvtime_tmdb_index', raw); } catch(e) {}
+            if (parsed && parsed.data) {
+                tmdbIndex = parsed.data;
+                if (fromCookie) {
+                    console.log('[CookieBridge] Loaded TMDB index from cookies (' +
+                        Object.keys(parsed.data).length + ' shows)');
+                    try { localStorage.setItem('tvtime_tmdb_index', raw); } catch(e) {}
+                }
             }
         }
     } catch(e) {}
 
     // Restore cached upcoming episodes (localStorage first, then cookie bridge)
     try {
-        var raw2 = localStorage.getItem('tvtime_upcoming_episodes') || getLargeCookie('tvtime_upcoming_episodes');
+        var fromCookie2 = false;
+        var raw2 = localStorage.getItem('tvtime_upcoming_episodes');
+        if (!raw2) { raw2 = getLargeCookie('tvtime_upcoming_episodes'); fromCookie2 = !!raw2; }
         if (raw2) {
             var parsed2 = JSON.parse(raw2);
-            // Sync back to localStorage if from cookie
-            if (!localStorage.getItem('tvtime_upcoming_episodes')) {
+            if (fromCookie2) {
+                console.log('[CookieBridge] Loaded upcoming episodes from cookies (' +
+                    (parsed2.data ? parsed2.data.length : 0) + ' episodes)');
                 try { localStorage.setItem('tvtime_upcoming_episodes', raw2); } catch(e) {}
             }
             if (parsed2 && parsed2.data && parsed2.data.length > 0) {
@@ -141,32 +149,30 @@ function init() {
     // Load watched episodes
     loadWatchedEpisodes();
 
-    // One-time sync: copy existing localStorage data to cookies so it's
-    // available when the app is opened as an iOS Home Screen Web App.
-    // (iOS isolates localStorage per context but shares cookies.)
+    // Sync localStorage → cookies so data is available in the iOS
+    // Home Screen Web App (which has isolated localStorage).
+    // Always overwrite to keep cookie data fresh.
     try {
-        var lsKey = localStorage.getItem('tvtime_tmdb_key');
-        if (lsKey && !getCookie('tvtime_tmdb_key')) setCookie('tvtime_tmdb_key', lsKey, 365);
+        var v = localStorage.getItem('tvtime_tmdb_key');
+        if (v) setCookie('tvtime_tmdb_key', v, 365);
 
-        var lsDeepKey = localStorage.getItem('tvtime_deepseek_key');
-        if (lsDeepKey && !getCookie('tvtime_deepseek_key')) setCookie('tvtime_deepseek_key', lsDeepKey, 365);
+        v = localStorage.getItem('tvtime_deepseek_key');
+        if (v) setCookie('tvtime_deepseek_key', v, 365);
 
-        var lsShows = localStorage.getItem('tvtime_user_shows');
-        if (lsShows && !getCookie('tvtime_user_shows') && lsShows.length < 3500) {
-            setCookie('tvtime_user_shows', lsShows, 365);
-        }
+        v = localStorage.getItem('tvtime_user_shows');
+        if (v) setCookie('tvtime_user_shows', v, 365);
 
-        var lsWatched = localStorage.getItem('tvtime_watched_episodes');
-        if (lsWatched && !getCookie('tvtime_watched_episodes') && lsWatched.length < 3500) {
-            setCookie('tvtime_watched_episodes', lsWatched, 365);
-        }
+        v = localStorage.getItem('tvtime_watched_episodes');
+        if (v) setCookie('tvtime_watched_episodes', v, 365);
 
-        // Sync cache data via multi-part cookies so Web App loads instantly
-        var lsIdx = localStorage.getItem('tvtime_tmdb_index');
-        if (lsIdx && !getLargeCookie('tvtime_tmdb_index')) setLargeCookie('tvtime_tmdb_index', lsIdx, 1);
+        // Cache data via multi-part cookies so Web App loads instantly
+        v = localStorage.getItem('tvtime_tmdb_index');
+        if (v) setLargeCookie('tvtime_tmdb_index', v, 1);
 
-        var lsUp = localStorage.getItem('tvtime_upcoming_episodes');
-        if (lsUp && !getLargeCookie('tvtime_upcoming_episodes')) setLargeCookie('tvtime_upcoming_episodes', lsUp, 1);
+        v = localStorage.getItem('tvtime_upcoming_episodes');
+        if (v) setLargeCookie('tvtime_upcoming_episodes', v, 1);
+
+        console.log('[CookieBridge] Synced localStorage → cookies');
     } catch(e) {}
 
     // Listen for localStorage changes from other tabs (e.g. GDPR import)

@@ -50,8 +50,8 @@ function init() {
         // Save user-added shows AND watched episodes before clearing
         var savedUserShows = null;
         var savedWatchedEps = null;
-        try { savedUserShows = localStorage.getItem('tvtime_user_shows'); } catch(e) {}
-        try { savedWatchedEps = localStorage.getItem('tvtime_watched_episodes'); } catch(e) {}
+        try { savedUserShows = localStorage.getItem('tvtime_user_shows') || getCookie('tvtime_user_shows'); } catch(e) {}
+        try { savedWatchedEps = localStorage.getItem('tvtime_watched_episodes') || getCookie('tvtime_watched_episodes'); } catch(e) {}
         var keys = [];
         for (var i = 0; i < localStorage.length; i++) {
             var k = localStorage.key(i);
@@ -78,9 +78,13 @@ function init() {
 
     console.log('[TVTime] followed shows count: ' + shows.length);
     try {
-        var rawUser = localStorage.getItem('tvtime_user_shows');
+        var rawUser = localStorage.getItem('tvtime_user_shows') || getCookie('tvtime_user_shows');
         if (rawUser) {
             userShows = JSON.parse(rawUser);
+            // Sync back to localStorage if loaded from cookie (iOS Web App bridge)
+            if (!localStorage.getItem('tvtime_user_shows')) {
+                try { localStorage.setItem('tvtime_user_shows', rawUser); } catch(e) {}
+            }
             // Merge user shows into shows array and ID set
             userShows.forEach(function(us) {
                 if (!shows.some(function(s) { return s.name === us.name; })) {
@@ -128,6 +132,27 @@ function init() {
 
     // Load watched episodes
     loadWatchedEpisodes();
+
+    // One-time sync: copy existing localStorage data to cookies so it's
+    // available when the app is opened as an iOS Home Screen Web App.
+    // (iOS isolates localStorage per context but shares cookies.)
+    try {
+        var lsKey = localStorage.getItem('tvtime_tmdb_key');
+        if (lsKey && !getCookie('tvtime_tmdb_key')) setCookie('tvtime_tmdb_key', lsKey, 365);
+
+        var lsDeepKey = localStorage.getItem('tvtime_deepseek_key');
+        if (lsDeepKey && !getCookie('tvtime_deepseek_key')) setCookie('tvtime_deepseek_key', lsDeepKey, 365);
+
+        var lsShows = localStorage.getItem('tvtime_user_shows');
+        if (lsShows && !getCookie('tvtime_user_shows') && lsShows.length < 3500) {
+            setCookie('tvtime_user_shows', lsShows, 365);
+        }
+
+        var lsWatched = localStorage.getItem('tvtime_watched_episodes');
+        if (lsWatched && !getCookie('tvtime_watched_episodes') && lsWatched.length < 3500) {
+            setCookie('tvtime_watched_episodes', lsWatched, 365);
+        }
+    } catch(e) {}
 
     // Listen for localStorage changes from other tabs (e.g. GDPR import)
     window.addEventListener('storage', function(e) {
@@ -291,8 +316,8 @@ function clearCache() {
     // Preserve user data: watched episodes and user-added shows
     var savedUserShows = null;
     var savedWatchedEps = null;
-    try { savedUserShows = localStorage.getItem('tvtime_user_shows'); } catch(e) {}
-    try { savedWatchedEps = localStorage.getItem('tvtime_watched_episodes'); } catch(e) {}
+    try { savedUserShows = localStorage.getItem('tvtime_user_shows') || getCookie('tvtime_user_shows'); } catch(e) {}
+    try { savedWatchedEps = localStorage.getItem('tvtime_watched_episodes') || getCookie('tvtime_watched_episodes'); } catch(e) {}
 
     var keys = [];
     for (var i = 0; i < localStorage.length; i++) {
@@ -1193,7 +1218,10 @@ window.debugWatched = function(showId) {
 
 function saveUserShows() {
     try {
-        localStorage.setItem('tvtime_user_shows', JSON.stringify(userShows));
+        var data = JSON.stringify(userShows);
+        localStorage.setItem('tvtime_user_shows', data);
+        // Sync to cookie for iOS Web App bridge (skip if > 3500 bytes)
+        if (data.length < 3500) setCookie('tvtime_user_shows', data, 365);
     } catch(e) {}
 }
 
@@ -1245,7 +1273,7 @@ function escAttr(s) {
 // ─── Watched Episodes Tracking ──────────────────────────────
 function loadWatchedEpisodes() {
     try {
-        var raw = localStorage.getItem('tvtime_watched_episodes');
+        var raw = localStorage.getItem('tvtime_watched_episodes') || getCookie('tvtime_watched_episodes');
         if (raw) {
             var parsed = JSON.parse(raw);
             var showCount = 0, epCount = 0;
@@ -1259,6 +1287,10 @@ function loadWatchedEpisodes() {
                     showCount++;
                 });
             });
+            // Sync back to localStorage if loaded from cookie
+            if (!localStorage.getItem('tvtime_watched_episodes')) {
+                try { localStorage.setItem('tvtime_watched_episodes', raw); } catch(e) {}
+            }
             console.log('[TVTime] Loaded watched episodes: ' + epCount + ' episodes across ' +
                 Object.keys(parsed).length + ' shows');
         } else {
@@ -1295,7 +1327,10 @@ function saveWatchedEpisodes() {
                 delete obj[showId];
             }
         });
-        localStorage.setItem('tvtime_watched_episodes', JSON.stringify(obj));
+        var data = JSON.stringify(obj);
+        localStorage.setItem('tvtime_watched_episodes', data);
+        // Sync to cookie for iOS Web App bridge (skip if > 3500 bytes)
+        if (data.length < 3500) setCookie('tvtime_watched_episodes', data, 365);
     } catch(e) {
         console.warn('Failed to save watched episodes:', e);
     }

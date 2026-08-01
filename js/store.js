@@ -2,6 +2,40 @@
  * Local storage cache for API responses.
  * Avoids hitting rate limits and speeds up repeat loads.
  */
+
+// ── Cookie helpers ────────────────────────────────────────────
+// Bridge localStorage between Safari and iOS Home Screen Web App.
+// On iOS, localStorage is isolated per context, but cookies are shared.
+
+function setCookie(name, value, days) {
+    try {
+        var expires = '';
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = '; expires=' + date.toUTCString();
+        }
+        document.cookie = name + '=' + encodeURIComponent(value) + expires + '; path=/; SameSite=Lax';
+    } catch(e) { /* Silently ignore cookie errors */ }
+}
+
+function getCookie(name) {
+    try {
+        var nameEQ = name + '=';
+        var ca = document.cookie.split(';');
+        for (var i = 0; i < ca.length; i++) {
+            var c = ca[i].trim();
+            if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length));
+        }
+    } catch(e) { /* Silently ignore */ }
+    return null;
+}
+
+function eraseCookie(name) {
+    try {
+        document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
+    } catch(e) { /* Silently ignore */ }
+}
 var Store = {
     _prefix: 'tvtime_',
 

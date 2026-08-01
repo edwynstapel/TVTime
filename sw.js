@@ -3,7 +3,7 @@
  * Caches core app files for offline use and fast loading.
  */
 
-var CACHE_NAME = 'tvtime-v5';
+var CACHE_NAME = 'tvtime-v6';
 var CORE_FILES = [
     'index.html',
     'css/style.css',

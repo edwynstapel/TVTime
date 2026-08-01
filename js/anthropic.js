@@ -12,14 +12,18 @@ var Anthropic = {
 
     getKey() {
         if (this._key) return this._key;
-        // Only use localStorage, no default key
-        this._key = localStorage.getItem('tvtime_deepseek_key') || '';
+        this._key = localStorage.getItem('tvtime_deepseek_key') || getCookie('tvtime_deepseek_key') || '';
+        // If found in cookie but not localStorage, sync it back (iOS Web App bridge)
+        if (this._key && !localStorage.getItem('tvtime_deepseek_key')) {
+            try { localStorage.setItem('tvtime_deepseek_key', this._key); } catch(e) {}
+        }
         return this._key;
     },
 
     setKey(key) {
         this._key = key;
         localStorage.setItem('tvtime_deepseek_key', key);
+        setCookie('tvtime_deepseek_key', key, 365);
     },
 
     /**

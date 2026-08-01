@@ -1292,6 +1292,9 @@ function removeShow(showName, tmdbId) {
     // Remove from shows array
     shows = shows.filter(function(s) { return s.name !== showName; });
 
+    // Remove episodes from upcoming array
+    upcoming = upcoming.filter(function(ep) { return ep.showName !== showName; });
+
     // If it's a built-in show (not user-added), track as unfollowed
     var builtInNames = (window.FOLLOWED_SHOWS || []);
     if (builtInNames.indexOf(showName) !== -1) {
@@ -1300,6 +1303,9 @@ function removeShow(showName, tmdbId) {
 
     saveUserShows();
     document.getElementById('showCount').textContent = shows.length + ' shows';
+
+    // Re-render timeline if on upcoming tab
+    if (currentTab === 'upcoming') renderTimeline();
 }
 
 function saveUnfollowed() {

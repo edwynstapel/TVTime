@@ -22,18 +22,14 @@ var TMDB = {
 
     getKey() {
         if (this._key) return this._key;
-        this._key = localStorage.getItem('tvtime_tmdb_key') || getCookie('tvtime_tmdb_key') || '';
-        // If found in cookie but not localStorage, sync it back (iOS Web App bridge)
-        if (this._key && !localStorage.getItem('tvtime_tmdb_key')) {
-            try { localStorage.setItem('tvtime_tmdb_key', this._key); } catch(e) {}
-        }
+        this._key = localStorage.getItem('tvtime_tmdb_key') || '';
         return this._key;
     },
 
     setKey(key) {
         this._key = key;
         localStorage.setItem('tvtime_tmdb_key', key);
-        setCookie('tvtime_tmdb_key', key, 365);
+        IDB.mirror('tvtime_tmdb_key', key);
     },
 
     /**

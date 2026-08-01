@@ -37,7 +37,13 @@ function log(msg) {
 }
 
 // ─── Init ─────────────────────────────────────────────────────
-function init() {
+async function init() {
+    // Restore from IndexedDB if localStorage was cleared (iOS Web App persistence).
+    // IndexedDB survives iOS storage cleanup better than localStorage in Web Apps.
+    if (!localStorage.getItem('tvtime_tmdb_key')) {
+        await IDB.restoreAll();
+    }
+
     // ── Data version check: clear stale caches when shows-data updates ──
     var DATA_VER = window.TVTIME_DATA_VERSION || 0;
     var storedVer = 0;
@@ -50,8 +56,8 @@ function init() {
         // Save user-added shows AND watched episodes before clearing
         var savedUserShows = null;
         var savedWatchedEps = null;
-        try { savedUserShows = localStorage.getItem('tvtime_user_shows') || getCookie('tvtime_user_shows'); } catch(e) {}
-        try { savedWatchedEps = localStorage.getItem('tvtime_watched_episodes') || getCookie('tvtime_watched_episodes'); } catch(e) {}
+        try { savedUserShows = localStorage.getItem('tvtime_user_shows'); } catch(e) {}
+        try { savedWatchedEps = localStorage.getItem('tvtime_watched_episodes'); } catch(e) {}
         var keys = [];
         for (var i = 0; i < localStorage.length; i++) {
             var k = localStorage.key(i);
@@ -78,13 +84,9 @@ function init() {
 
     console.log('[TVTime] followed shows count: ' + shows.length);
     try {
-        var rawUser = localStorage.getItem('tvtime_user_shows') || getCookie('tvtime_user_shows');
+        var rawUser = localStorage.getItem('tvtime_user_shows');
         if (rawUser) {
             userShows = JSON.parse(rawUser);
-            // Sync back to localStorage if loaded from cookie (iOS Web App bridge)
-            if (!localStorage.getItem('tvtime_user_shows')) {
-                try { localStorage.setItem('tvtime_user_shows', rawUser); } catch(e) {}
-            }
             // Merge user shows into shows array and ID set
             userShows.forEach(function(us) {
                 if (!shows.some(function(s) { return s.name === us.name; })) {
@@ -107,36 +109,20 @@ function init() {
         }
     } catch(e) {}
 
-    // Restore cached TMDB index (localStorage first, then cookie bridge)
+    // Restore cached TMDB index
     try {
-        var fromCookie = false;
         var raw = localStorage.getItem('tvtime_tmdb_index');
-        if (!raw) { raw = getLargeCookie('tvtime_tmdb_index'); fromCookie = !!raw; }
         if (raw) {
             var parsed = JSON.parse(raw);
-            if (parsed && parsed.data) {
-                tmdbIndex = parsed.data;
-                if (fromCookie) {
-                    console.log('[CookieBridge] Loaded TMDB index from cookies (' +
-                        Object.keys(parsed.data).length + ' shows)');
-                    try { localStorage.setItem('tvtime_tmdb_index', raw); } catch(e) {}
-                }
-            }
+            if (parsed && parsed.data) tmdbIndex = parsed.data;
         }
     } catch(e) {}
 
-    // Restore cached upcoming episodes (localStorage first, then cookie bridge)
+    // Restore cached upcoming episodes
     try {
-        var fromCookie2 = false;
         var raw2 = localStorage.getItem('tvtime_upcoming_episodes');
-        if (!raw2) { raw2 = getLargeCookie('tvtime_upcoming_episodes'); fromCookie2 = !!raw2; }
         if (raw2) {
             var parsed2 = JSON.parse(raw2);
-            if (fromCookie2) {
-                console.log('[CookieBridge] Loaded upcoming episodes from cookies (' +
-                    (parsed2.data ? parsed2.data.length : 0) + ' episodes)');
-                try { localStorage.setItem('tvtime_upcoming_episodes', raw2); } catch(e) {}
-            }
             if (parsed2 && parsed2.data && parsed2.data.length > 0) {
                 upcoming = parsed2.data.map(function(ep) {
                     ep.airDate = ep.airDate ? new Date(ep.airDate) : null;
@@ -149,33 +135,18 @@ function init() {
     // Load watched episodes
     loadWatchedEpisodes();
 
-    // Sync localStorage → cookies so data is available in the iOS
-    // Home Screen Web App (which has isolated localStorage).
-    // Always overwrite to keep cookie data fresh.
+    // Mirror critical persistent data to IndexedDB for iOS Web App survival
     try {
         var v = localStorage.getItem('tvtime_tmdb_key');
-        if (v) setCookie('tvtime_tmdb_key', v, 365);
-
+        if (v) IDB.mirror('tvtime_tmdb_key', v);
         v = localStorage.getItem('tvtime_deepseek_key');
-        if (v) setCookie('tvtime_deepseek_key', v, 365);
-
+        if (v) IDB.mirror('tvtime_deepseek_key', v);
         v = localStorage.getItem('tvtime_user_shows');
-        if (v) setCookie('tvtime_user_shows', v, 365);
-
+        if (v) IDB.mirror('tvtime_user_shows', v);
         v = localStorage.getItem('tvtime_watched_episodes');
-        if (v) setCookie('tvtime_watched_episodes', v, 365);
-
-        // Cache data via multi-part cookies so Web App loads instantly
-        v = localStorage.getItem('tvtime_tmdb_index');
-        if (v) setLargeCookie('tvtime_tmdb_index', v, 1);
-
-        v = localStorage.getItem('tvtime_upcoming_episodes');
-        if (v) setLargeCookie('tvtime_upcoming_episodes', v, 1);
-
-        // Save near-future subset for instant Web App load
-        if (upcoming.length > 0) saveNearFutureCookie(upcoming);
-
-        console.log('[CookieBridge] Synced localStorage → cookies');
+        if (v) IDB.mirror('tvtime_watched_episodes', v);
+        v = localStorage.getItem('tvtime_data_version');
+        if (v) IDB.mirror('tvtime_data_version', v);
     } catch(e) {}
 
     // Listen for localStorage changes from other tabs (e.g. GDPR import)
@@ -340,8 +311,8 @@ function clearCache() {
     // Preserve user data: watched episodes and user-added shows
     var savedUserShows = null;
     var savedWatchedEps = null;
-    try { savedUserShows = localStorage.getItem('tvtime_user_shows') || getCookie('tvtime_user_shows'); } catch(e) {}
-    try { savedWatchedEps = localStorage.getItem('tvtime_watched_episodes') || getCookie('tvtime_watched_episodes'); } catch(e) {}
+    try { savedUserShows = localStorage.getItem('tvtime_user_shows'); } catch(e) {}
+    try { savedWatchedEps = localStorage.getItem('tvtime_watched_episodes'); } catch(e) {}
 
     var keys = [];
     for (var i = 0; i < localStorage.length; i++) {
@@ -396,96 +367,6 @@ function showWelcome() {
 //  Result: ~70 API calls instead of ~124 for 62 shows. The expensive
 //          getSeason() calls only hit the 5-15 shows that matter.
 
-// ── Near-future cookie bridge for iOS Web App instant load ─────
-// The full upcoming cache is too large for cookies, so we store a
-// compact subset (next 30 days) that fits in ~3-4 cookie chunks.
-
-function saveNearFutureCookie(episodes) {
-    try {
-        var now = new Date(); now.setHours(0, 0, 0, 0);
-        var future = new Date(now); future.setDate(future.getDate() + 30);
-
-        var near = episodes.filter(function(ep) {
-            return ep.airDate && ep.airDate >= now && ep.airDate <= future;
-        });
-
-        if (near.length === 0) return;
-
-        // Compact format — short keys to minimize size
-        var compact = near.map(function(ep) {
-            var obj = {
-                s: ep.tmdbShowId || ep.showId,
-                n: ep.showName,
-                sn: ep.season_number,
-                en: ep.episode_number,
-                nm: ep.name || '',
-                ad: ep.air_date
-            };
-            if (ep.showPoster) obj.p = ep.showPoster;
-            if (ep.showBackdrop) obj.b = ep.showBackdrop;
-            if (ep.overview) obj.o = ep.overview.substring(0, 200);
-            if (ep.vote_average) obj.v = ep.vote_average;
-            if (ep.runtime) obj.r = ep.runtime;
-            if (ep.networks) obj.nw = ep.networks;
-            if (ep.tmdbEpisodeId) obj.te = ep.tmdbEpisodeId;
-            return obj;
-        });
-
-        var raw = JSON.stringify({ data: compact, expires: Date.now() + 24 * 60 * 60 * 1000 });
-        setLargeCookie('tvtime_upcoming_near', raw, 1);
-        console.log('[CookieBridge] Saved near-future cookie: ' + compact.length + ' episodes (' + raw.length + ' bytes)');
-    } catch(e) { console.warn('[CookieBridge] saveNearFutureCookie failed:', e.message); }
-}
-
-function loadNearFutureCookie() {
-    try {
-        var raw = getLargeCookie('tvtime_upcoming_near');
-        if (!raw) return null;
-
-        var parsed = JSON.parse(raw);
-        if (!parsed || !parsed.data || !parsed.data.length) return null;
-
-        // Check expiry
-        if (parsed.expires && Date.now() > parsed.expires) {
-            eraseLargeCookie('tvtime_upcoming_near');
-            return null;
-        }
-
-        // Expand compact format back to full episode objects
-        var episodes = parsed.data.map(function(c) {
-            return {
-                showId: c.s,
-                tmdbShowId: c.s,
-                showName: c.n,
-                season_number: c.sn,
-                episode_number: c.en,
-                name: c.nm,
-                air_date: c.ad,
-                airDate: c.ad ? new Date(c.ad + 'T00:00:00') : null,
-                showPoster: c.p || '',
-                showBackdrop: c.b || '',
-                overview: c.o || '',
-                vote_average: c.v || 0,
-                runtime: c.r || null,
-                networks: c.nw || '',
-                tmdbEpisodeId: c.te || null,
-                still_path: null
-            };
-        });
-
-        // Sort by air date
-        episodes.sort(function(a, b) {
-            return (a.airDate ? a.airDate.getTime() : 0) - (b.airDate ? b.airDate.getTime() : 0);
-        });
-
-        console.log('[CookieBridge] Loaded near-future cookie: ' + episodes.length + ' episodes');
-        return episodes;
-    } catch(e) {
-        console.warn('[CookieBridge] loadNearFutureCookie failed:', e.message);
-        return null;
-    }
-}
-
 async function loadUpcoming(force) {
     var c = document.getElementById('timelineContainer');
     var key = TMDB.getKey();
@@ -493,31 +374,12 @@ async function loadUpcoming(force) {
     if (!key) { showWelcome(); return; }
     if (!force && upcoming.length > 0) { renderTimeline(); return; }
 
-    // Cold start with near-future cookie bridge: load instant subset
-    // while full data refreshes in the background (iOS Web App support).
-    if (!force && upcoming.length === 0) {
-        var nearFuture = loadNearFutureCookie();
-        if (nearFuture && nearFuture.length > 0) {
-            console.log('[CookieBridge] Instant load from near-future cookie — ' +
-                nearFuture.length + ' episodes, refreshing full data in background...');
-            upcoming = nearFuture;
-            renderTimeline();
-            // Refresh full data in background
-            setTimeout(function() { loadUpcoming(true); }, 500);
-            return;
-        }
-    }
-
-    // Only show spinner on true cold start (no data at all).
-    // During background refresh, keep existing timeline visible.
-    if (upcoming.length === 0) {
-        c.innerHTML =
-            '<div class="loading-spinner">' +
-                '<div class="spinner"></div>' +
-                '<p id="statusText">Starting...</p>' +
-                '<p style="font-size:12px;color:var(--text-muted);margin-top:8px;" id="statusDetail"></p>' +
-            '</div>';
-    }
+    c.innerHTML =
+        '<div class="loading-spinner">' +
+            '<div class="spinner"></div>' +
+            '<p id="statusText">Starting...</p>' +
+            '<p style="font-size:12px;color:var(--text-muted);margin-top:8px;" id="statusDetail"></p>' +
+        '</div>';
 
     var statusEl = function() { return document.getElementById('statusText'); };
     var detailEl = function() { return document.getElementById('statusDetail'); };
@@ -549,7 +411,6 @@ async function loadUpcoming(force) {
             }
             try { var raw = JSON.stringify({data: tmdbIndex, expires: Date.now() + 24*60*60*1000});
                 localStorage.setItem('tvtime_tmdb_index', raw);
-                setLargeCookie('tvtime_tmdb_index', raw, 1);
             } catch(e) {}
         }
 
@@ -717,12 +578,7 @@ async function loadUpcoming(force) {
 
         try { var rawUp = JSON.stringify({data: upcoming, expires: Date.now() + 6*60*60*1000});
             localStorage.setItem('tvtime_upcoming_episodes', rawUp);
-            setLargeCookie('tvtime_upcoming_episodes', rawUp, 1);
         } catch(e) {}
-
-        // Save a compact near-future subset to cookies so the iOS Web App
-        // loads instantly (shows next 30 days while full data refreshes).
-        saveNearFutureCookie(upcoming);
 
         status('Done! ' + upcoming.length + ' upcoming episodes from ' +
                activeShows.length + ' active + ' + dormantShows.length + ' ended shows');
@@ -1359,8 +1215,7 @@ function saveUserShows() {
     try {
         var data = JSON.stringify(userShows);
         localStorage.setItem('tvtime_user_shows', data);
-        // Sync to cookie for iOS Web App bridge (skip if > 3500 bytes)
-        if (data.length < 3500) setCookie('tvtime_user_shows', data, 365);
+        IDB.mirror('tvtime_user_shows', data);
     } catch(e) {}
 }
 
@@ -1412,7 +1267,7 @@ function escAttr(s) {
 // ─── Watched Episodes Tracking ──────────────────────────────
 function loadWatchedEpisodes() {
     try {
-        var raw = localStorage.getItem('tvtime_watched_episodes') || getCookie('tvtime_watched_episodes');
+        var raw = localStorage.getItem('tvtime_watched_episodes');
         if (raw) {
             var parsed = JSON.parse(raw);
             var showCount = 0, epCount = 0;
@@ -1426,10 +1281,6 @@ function loadWatchedEpisodes() {
                     showCount++;
                 });
             });
-            // Sync back to localStorage if loaded from cookie
-            if (!localStorage.getItem('tvtime_watched_episodes')) {
-                try { localStorage.setItem('tvtime_watched_episodes', raw); } catch(e) {}
-            }
             console.log('[TVTime] Loaded watched episodes: ' + epCount + ' episodes across ' +
                 Object.keys(parsed).length + ' shows');
         } else {
@@ -1468,8 +1319,7 @@ function saveWatchedEpisodes() {
         });
         var data = JSON.stringify(obj);
         localStorage.setItem('tvtime_watched_episodes', data);
-        // Sync to cookie for iOS Web App bridge (skip if > 3500 bytes)
-        if (data.length < 3500) setCookie('tvtime_watched_episodes', data, 365);
+        IDB.mirror('tvtime_watched_episodes', data);
     } catch(e) {
         console.warn('Failed to save watched episodes:', e);
     }
@@ -1850,7 +1700,6 @@ async function openShowDetail(showName) {
                         voteAverage: result.vote_average };
                     try { var rawIdx = JSON.stringify({data: tmdbIndex, expires: Date.now() + 24*60*60*1000});
                         localStorage.setItem('tvtime_tmdb_index', rawIdx);
-                        setLargeCookie('tvtime_tmdb_index', rawIdx, 1);
                     } catch(e) {}
                     t = tmdbIndex[showName];
                 }
